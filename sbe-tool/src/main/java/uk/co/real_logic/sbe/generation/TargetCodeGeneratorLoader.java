@@ -26,6 +26,8 @@ import uk.co.real_logic.sbe.generation.java.JavaGenerator;
 import uk.co.real_logic.sbe.generation.java.JavaOutputManager;
 import uk.co.real_logic.sbe.generation.rust.RustGenerator;
 import uk.co.real_logic.sbe.generation.rust.RustOutputManager;
+import uk.co.real_logic.sbe.generation.julia.JuliaGenerator;
+import uk.co.real_logic.sbe.generation.julia.JuliaOutputManager;
 import uk.co.real_logic.sbe.ir.Ir;
 
 import static uk.co.real_logic.sbe.SbeTool.*;
@@ -118,6 +120,20 @@ public enum TargetCodeGeneratorLoader implements TargetCodeGenerator
             return new RustGenerator(
                 ir,
                 new RustOutputManager(outputDir, ir.packageName()));
+        }
+    },
+
+    /**
+     * Generates codecs for the Julia programming language.
+     */
+    JULIA()
+    {
+        /**
+         * {@inheritDoc}
+         */
+        public CodeGenerator newInstance(final Ir ir, final String outputDir)
+        {
+            return new JuliaGenerator(ir, new JuliaOutputManager(outputDir, ir.applicableNamespace()));
         }
     };
 

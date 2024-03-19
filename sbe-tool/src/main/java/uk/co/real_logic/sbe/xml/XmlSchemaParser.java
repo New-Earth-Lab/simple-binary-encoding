@@ -436,6 +436,11 @@ public class XmlSchemaParser
         {
             handleWarning(node, "name is not valid for C#: " + name);
         }
+
+        if (!ValidationUtil.isSbeJuliaName(name))
+        {
+            handleWarning(node, "name is not valid for Julia: " + name);
+        }        
     }
 
     private static void addTypeWithNameCheck(final Map<String, Type> typeByNameMap, final Type type, final Node node)

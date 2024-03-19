@@ -518,4 +518,102 @@ public class ValidationUtil
                 return false;
         }
     }
+
+        /* https://docs.julialang.org/en/v1/base/base/#Keywords */
+        private static final Set<String> JULIA_KEYWORDS = new HashSet<>(Arrays.asList(
+            "baremodule", "begin", "break", "catch", "const",
+            "continue", "do", "else", "elsif", "end",
+            "export", "false", "finally", "for", "function",
+            "global", "if", "import", "let", "local",
+            "macro", "module", "quote", "return", "struct",
+            "true", "try", "using", "while",
+            "abstract type", "mutable struct", "primitive type", "_",
+    
+            "Number", "Real", "Integer", "Signed", "Unsigned",
+
+            /* https://docs.julialang.org/en/v1/manual/types/#Primitive-Types */
+            "Float16", "Float32", "Float64",
+            "Bool", "Char",
+            "Int8", "UInt8", "Int16", "UInt16", "Int32", "UInt32",
+            "Int64", "UInt64", "Int128", "UInt128"));
+    
+        /**
+         * "Check" value for validity of usage as a julia identifier. From:
+         * <a href="https://docs.julialang.org/en/v1/manual/variables/#man-allowed-variable-names">Allowed Variable Names</a>
+         * <p>
+         * identifier = letter { letter | unicode_digit }
+         * letter        = unicode_letter | "_" .
+         * <p>
+         * unicode_letter and unicode_digit are defined in section 4.5 of the unicode
+         * standard at <a href="http://www.unicode.org/versions/Unicode8.0.0/">Unicode 8.0.0</a> and
+         * the Java Character and Digit functions are unicode friendly
+         *
+         * @param value to check
+         * @return true for validity as a julia name. false if not.
+         */
+        public static boolean isSbeJuliaName(final String value)
+        {
+            if (possibleJuliaKeyword(value))
+            {
+                if (isJuliaKeyword(value))
+                {
+                    return false;
+                }
+            }
+            else
+            {
+                return false;
+            }
+    
+            return true;
+        }
+    
+        /**
+         * Is the token a Julia language keyword?
+         *
+         * @param token to be checked.
+         * @return true if the token a Julia language keyword.
+         */
+        public static boolean isJuliaKeyword(final String token)
+        {
+            return JULIA_KEYWORDS.contains(token);
+        }
+    
+        /**
+         * Is the value a possible Julia language keyword?
+         *
+         * @param value to be checked.
+         * @return true if the value is a possible Julia language keyword.
+         */
+        private static boolean possibleJuliaKeyword(final String value)
+        {
+            for (int i = 0, size = value.length(); i < size; i++)
+            {
+                final char c = value.charAt(i);
+    
+                if (i == 0 && isSbeJuliaIdentifierStart(c))
+                {
+                    continue;
+                }
+    
+                if (isSbeJuliaIdentifierPart(c))
+                {
+                    continue;
+                }
+    
+                return false;
+            }
+    
+            return true;
+        }
+    
+        private static boolean isSbeJuliaIdentifierStart(final char c)
+        {
+            return Character.isLetter(c) || c == '_';
+        }
+    
+        private static boolean isSbeJuliaIdentifierPart(final char c)
+        {
+            return Character.isLetterOrDigit(c) || c == '_';
+        }
 }
