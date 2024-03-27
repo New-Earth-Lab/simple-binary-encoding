@@ -56,7 +56,7 @@ class LibRsDef
         {
             indent(libRs, 0, "#![forbid(unsafe_code)]\n");
             indent(libRs, 0, "#![allow(clippy::upper_case_acronyms)]\n");
-            indent(libRs, 0, "#![allow(non_camel_case_types)]\n");
+            indent(libRs, 0, "#![allow(non_camel_case_types)]\n\n");
             indent(libRs, 0, "use ::core::{convert::TryInto};\n\n");
 
             final ArrayList<String> modules = new ArrayList<>();
@@ -75,13 +75,6 @@ class LibRsDef
             for (final String mod : modules)
             {
                 indent(libRs, 0, "pub mod %s;\n", toLowerSnakeCase(mod));
-            }
-            indent(libRs, 0, "\n");
-
-            // add re-export of modules
-            for (final String module : modules)
-            {
-                indent(libRs, 0, "pub use crate::%s::*;\n", toLowerSnakeCase(module));
             }
             indent(libRs, 0, "\n");
 
@@ -163,6 +156,7 @@ class LibRsDef
         indent(writer, 0, "}\n");
 
         // impl ReadBuf ...
+        indent(writer, 0, "#[allow(dead_code)]\n");
         indent(writer, 0, "impl<%s> %s<%s> {\n", BUF_LIFETIME, READ_BUF_TYPE, BUF_LIFETIME);
         indent(writer, 1, "#[inline]\n");
         indent(writer, 1, "pub fn new(data: &%s [u8]) -> Self {\n", BUF_LIFETIME);
@@ -225,8 +219,8 @@ class LibRsDef
 
         indent(writer, 1, "#[inline]\n");
         indent(writer, 1,
-            "pub fn put_bytes_at<const COUNT: usize>(&mut self, index: usize, bytes: [u8; COUNT]) -> usize {\n");
-        indent(writer, 2, "self.data[index..index + COUNT].copy_from_slice(&bytes);\n");
+            "pub fn put_bytes_at<const COUNT: usize>(&mut self, index: usize, bytes: &[u8; COUNT]) -> usize {\n");
+        indent(writer, 2, "self.data[index..index + COUNT].copy_from_slice(bytes);\n");
         indent(writer, 2, "COUNT\n");
         indent(writer, 1, "}\n\n");
 
@@ -245,7 +239,7 @@ class LibRsDef
             // put_<primitive>_at
             indent(writer, 1, "#[inline]\n");
             indent(writer, 1, "pub fn put_%1$s_at(&mut self, index: usize, value: %1$s) {\n", primitiveType);
-            indent(writer, 2, "self.put_bytes_at(index, %s::to_%s_bytes(value));\n", primitiveType, endianness);
+            indent(writer, 2, "self.put_bytes_at(index, &%s::to_%s_bytes(value));\n", primitiveType, endianness);
             indent(writer, 1, "}\n\n");
         }
 
