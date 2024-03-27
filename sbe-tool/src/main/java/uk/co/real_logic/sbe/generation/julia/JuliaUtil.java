@@ -60,12 +60,12 @@ public class JuliaUtil
     }
 
     /**
-     * Format a String as a class name.
+     * Format a String as a struct name.
      *
      * @param value to be formatted.
-     * @return the string formatted as a class name.
+     * @return the string formatted as a struct name.
      */
-    public static String formatClassName(final String value)
+    public static String formatStructName(final String value)
     {
         return toUpperFirstChar(value);
     }
@@ -110,7 +110,7 @@ public class JuliaUtil
             "be" : "le");
 
         // return "decode_" + suffix + "(" + juliaTypeName(primitiveType) + ", ";
-        return "decode_" + suffix;            
+        return "decode_" + suffix;
     }
 
     /**
