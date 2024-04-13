@@ -18,8 +18,6 @@ package uk.co.real_logic.sbe.generation.julia;
 import static uk.co.real_logic.sbe.generation.Generators.toUpperFirstChar;
 import static uk.co.real_logic.sbe.generation.julia.JuliaUtil.formatStructName;
 import static uk.co.real_logic.sbe.generation.julia.JuliaUtil.formatPropertyName;
-import static uk.co.real_logic.sbe.generation.julia.JuliaUtil.formatReadBytes;
-import static uk.co.real_logic.sbe.generation.julia.JuliaUtil.formatWriteBytes;
 import static uk.co.real_logic.sbe.generation.julia.JuliaUtil.juliaTypeName;
 import static uk.co.real_logic.sbe.ir.GenerationUtil.collect;
 import static uk.co.real_logic.sbe.ir.GenerationUtil.collectFields;
@@ -557,8 +555,6 @@ public class JuliaGenerator implements CodeGenerator
                 collectVarData(messageBody, i, varData);
 
                 final StringBuilder sb = new StringBuilder();
-
-                // generateGroupStructs(sb, groups, BASE_INDENT);
 
                 sb.append(generateMessageFlyweightStruct(structName, fields, groups));
                 sb.append(generateMessageFlyweightMethods(structName, msgToken));
@@ -1164,13 +1160,13 @@ public class JuliaGenerator implements CodeGenerator
         final String value)
     {
         final PrimitiveType primitiveType = token.encoding().primitiveType();
-        final ByteOrder byteOrder = token.encoding().byteOrder();
+        final String byteOrderSuffix = token.encoding().byteOrder() == ByteOrder.BIG_ENDIAN ? "be" : "le";
         final String juliaTypeName = juliaTypeName(primitiveType);
         final StringBuilder sb = new StringBuilder();
 
         new Formatter(sb).format(
-            "%1$s(%2$s, %3$s, %4$s, %5$s)",
-            formatWriteBytes(byteOrder, primitiveType),
+            "encode_%1$s(%2$s, %3$s, %4$s, %5$s)",
+            byteOrderSuffix,
             juliaTypeName,
             buffer,
             index,
@@ -1185,16 +1181,61 @@ public class JuliaGenerator implements CodeGenerator
         final String index)
     {
         final PrimitiveType primitiveType = token.encoding().primitiveType();
-        final ByteOrder byteOrder = token.encoding().byteOrder();
+        final String byteOrderSuffix = token.encoding().byteOrder() == ByteOrder.BIG_ENDIAN ? "be" : "le";
         final String juliaTypeName = juliaTypeName(primitiveType);
         final StringBuilder sb = new StringBuilder();
 
         new Formatter(sb).format(
-            "%1$s(%2$s, %3$s, %4$s)",
-            formatReadBytes(byteOrder, primitiveType),
+            "decode_%1$s(%2$s, %3$s, %4$s)",
+            byteOrderSuffix,
             juliaTypeName,
             buffer,
             index);
+
+        return sb;
+    }
+
+    private CharSequence generateGetArrayReadWrite(
+        final Token token,
+        final String typeName,
+        final String buffer,
+        final String index,
+        final String length)
+    {
+        final ByteOrder byteOrder = token.encoding().byteOrder();
+        final StringBuilder sb = new StringBuilder();
+
+        addModuleToUsing("MappedArrays");
+        new Formatter(sb).format(
+            "mappedarray(%1$s, %2$s, reinterpret(%3$s, view(%4$s, %5$s+1:%5$s+%6$s)))",
+            byteOrder == ByteOrder.BIG_ENDIAN ? "ntoh" : "ltoh",
+            byteOrder == ByteOrder.BIG_ENDIAN ? "hton" : "htol",
+            typeName,
+            buffer,
+            index,
+            length);
+
+        return sb;
+    }
+
+    private CharSequence generateGetArrayReadOnly(
+        final Token token,
+        final String typeName,
+        final String buffer,
+        final String index,
+        final String length)
+    {
+        final ByteOrder byteOrder = token.encoding().byteOrder();
+        final StringBuilder sb = new StringBuilder();
+
+        addModuleToUsing("MappedArrays");
+        new Formatter(sb).format(
+            "mappedarray(%1$s, reinterpret(%2$s, view(%3$s, %4$s+1:%4$s+%5$s))[])",
+            byteOrder == ByteOrder.BIG_ENDIAN ? "ntoh" : "ltoh",
+            typeName,
+            buffer,
+            index,
+            length);
 
         return sb;
     }
@@ -1249,32 +1290,36 @@ public class JuliaGenerator implements CodeGenerator
             formatStructName(containingStructName));
 
         new Formatter(sb).format("\n" +
-            indent + "@inline function %2$s(m::%6$s)\n" +
-            indent + "%4$s" +
-            indent + "    return @inbounds reinterpret(%1$s, view(m.buffer, m.offset+1+%5$d:m.offset+%5$d+sizeof(%1$s)*%3$d))\n" +
+            indent + "@inline function %1$s(m::%2$s)\n" +
+            indent + "%3$s" +
+            indent + "    return @inbounds %4$s\n" +
             indent + "end\n",
-            juliaTypeName,
             propertyName,
-            arrayLength,
+            formatStructName(containingStructName),
             generateArrayFieldNotPresentCondition(propertyToken.version(), indent),
-            offset,
-            formatStructName(containingStructName));
+            generateGetArrayReadWrite(encodingToken,
+                juliaTypeName,
+                "m.buffer",
+                "m.offset+" + Integer.toString(offset),
+                "sizeof(" + juliaTypeName + ")*" + Integer.toString(arrayLength)));
 
         // Only use StaticArrays for arrays of less than 100 elements
         if (arrayLength < 100)
         {
             addModuleToUsing("StaticArrays");
             new Formatter(sb).format("\n" +
-                indent + "@inline function %2$s_static(m::%6$s)\n" +
-                indent + "%4$s" +
-                indent + "    return @inbounds reinterpret(SVector{%3$d,%1$s}, view(m.buffer, m.offset+1+%5$d:m.offset+%5$d+sizeof(%1$s)*%3$d))[]\n" +
+                indent + "@inline function %1$s_static(m::%2$s)\n" +
+                indent + "%3$s" +
+                indent + "    return @inbounds %4$s\n" +
                 indent + "end\n",
-                juliaTypeName,
                 propertyName,
-                arrayLength,
+                formatStructName(containingStructName),
                 generateArrayFieldNotPresentCondition(propertyToken.version(), indent),
-                offset,
-                formatStructName(containingStructName));
+                generateGetArrayReadOnly(encodingToken,
+                    "SVector{" + Integer.toString(arrayLength) + "," + juliaTypeName + "}",
+                    "m.buffer",
+                    "m.offset+" + Integer.toString(offset),
+                    "sizeof(" + juliaTypeName + ")*" + Integer.toString(arrayLength)));
         }
 
         if (encodingToken.encoding().primitiveType() == PrimitiveType.CHAR)
@@ -1299,16 +1344,18 @@ public class JuliaGenerator implements CodeGenerator
         }
 
         new Formatter(sb).format("\n" +
-            indent + "@inline function %2$s!(m::%6$s, value)\n" +
-            indent + "%4$s" +
-            indent + "    copyto!(reinterpret(%1$s, view(m.buffer, m.offset+1+%5$d:m.offset+%5$d+sizeof(%1$s)*%3$d)), value)\n" +
+            indent + "@inline function %1$s!(m::%2$s, value)\n" +
+            indent + "%3$s" +
+            indent + "    copyto!(%4$s, value)\n" +
             indent + "end\n",
-            juliaTypeName,
             propertyName,
-            arrayLength,
+            formatStructName(containingStructName),
             generateArrayFieldNotPresentCondition(propertyToken.version(), indent),
-            offset,
-            formatStructName(containingStructName));
+            generateGetArrayReadWrite(encodingToken,
+                juliaTypeName,
+                "m.buffer",
+                "m.offset+" + Integer.toString(offset),
+                "sizeof(" + juliaTypeName + ")*" + Integer.toString(arrayLength)));
     }
 
     private void generateConstPropertyMethods(
