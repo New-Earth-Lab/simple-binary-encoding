@@ -19,7 +19,6 @@ import uk.co.real_logic.sbe.PrimitiveType;
 import uk.co.real_logic.sbe.SbeTool;
 import uk.co.real_logic.sbe.ValidationUtil;
 
-import java.nio.ByteOrder;
 import java.util.EnumMap;
 import java.util.Map;
 
@@ -60,21 +59,12 @@ public class JuliaUtil
     }
 
     /**
-<<<<<<< HEAD
      * Format a String as a struct name.
      *
      * @param value to be formatted.
      * @return the string formatted as a struct name.
      */
     public static String formatStructName(final String value)
-=======
-     * Format a String as a class name.
-     *
-     * @param value to be formatted.
-     * @return the string formatted as a class name.
-     */
-    public static String formatClassName(final String value)
->>>>>>> 7f108351 (Add Julia code generation support)
     {
         return toUpperFirstChar(value);
     }
@@ -106,39 +96,4 @@ public class JuliaUtil
         return formattedValue;
     }
 
-<<<<<<< HEAD
-=======
-    /**
-     * Return the Julia formatted byte order encoding string to use to read for a given byte order and primitiveType
-     *
-     * @param byteOrder     of the {@link uk.co.real_logic.sbe.ir.Token}
-     * @param primitiveType of the {@link uk.co.real_logic.sbe.ir.Token}
-     * @return the string formatted as the byte ordering encoding
-     */
-    public static String formatReadBytes(final ByteOrder byteOrder, final PrimitiveType primitiveType)
-    {
-        final String suffix = (byteOrder == ByteOrder.BIG_ENDIAN ?
-            "be" : "le");
-
-        // return "decode_" + suffix + "(" + juliaTypeName(primitiveType) + ", ";
-        return "decode_" + suffix;            
-    }
-
-    /**
-     * Return the Julia formatted byte order encoding string to use to write for a given byte order and primitiveType
-     *
-     * @param byteOrder     of the {@link uk.co.real_logic.sbe.ir.Token}
-     * @param primitiveType of the {@link uk.co.real_logic.sbe.ir.Token}
-     * @return the string formatted as the byte ordering encoding
-     */
-    public static String formatWriteBytes(final ByteOrder byteOrder, final PrimitiveType primitiveType)
-    {
-        final String suffix = (byteOrder == ByteOrder.BIG_ENDIAN ?
-            "be" : "le");
-
-        // return "encode_" + suffix + "!(" + juliaTypeName(primitiveType) + ", ";
-        return "encode_" + suffix + "!";
-    }
-
->>>>>>> 7f108351 (Add Julia code generation support)
 }

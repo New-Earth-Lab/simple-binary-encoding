@@ -518,7 +518,7 @@ public class ValidationUtil
     }
 
         /* https://docs.julialang.org/en/v1/base/base/#Keywords */
-        private static final Set<String> JULIA_KEYWORDS = new HashSet<>(Arrays.asList(
+        private static final Set<String> JULIA_KEYWORDS = Set.of(
             "baremodule", "begin", "break", "catch", "const",
             "continue", "do", "else", "elsif", "end",
             "export", "false", "finally", "for", "function",
@@ -526,15 +526,15 @@ public class ValidationUtil
             "macro", "module", "quote", "return", "struct",
             "true", "try", "using", "while",
             "abstract type", "mutable struct", "primitive type", "_",
-    
+
             "Number", "Real", "Integer", "Signed", "Unsigned",
 
             /* https://docs.julialang.org/en/v1/manual/types/#Primitive-Types */
             "Float16", "Float32", "Float64",
             "Bool", "Char",
             "Int8", "UInt8", "Int16", "UInt16", "Int32", "UInt32",
-            "Int64", "UInt64", "Int128", "UInt128"));
-    
+            "Int64", "UInt64", "Int128", "UInt128");
+
         /**
          * "Check" value for validity of usage as a julia identifier. From:
          * <a href="https://docs.julialang.org/en/v1/manual/variables/#man-allowed-variable-names">Allowed Variable Names</a>
@@ -562,10 +562,10 @@ public class ValidationUtil
             {
                 return false;
             }
-    
+
             return true;
         }
-    
+
         /**
          * Is the token a Julia language keyword?
          *
@@ -576,7 +576,7 @@ public class ValidationUtil
         {
             return JULIA_KEYWORDS.contains(token);
         }
-    
+
         /**
          * Is the value a possible Julia language keyword?
          *
@@ -588,28 +588,28 @@ public class ValidationUtil
             for (int i = 0, size = value.length(); i < size; i++)
             {
                 final char c = value.charAt(i);
-    
+
                 if (i == 0 && isSbeJuliaIdentifierStart(c))
                 {
                     continue;
                 }
-    
+
                 if (isSbeJuliaIdentifierPart(c))
                 {
                     continue;
                 }
-    
+
                 return false;
             }
-    
+
             return true;
         }
-    
+
         private static boolean isSbeJuliaIdentifierStart(final char c)
         {
             return Character.isLetter(c) || c == '_';
         }
-    
+
         private static boolean isSbeJuliaIdentifierPart(final char c)
         {
             return Character.isLetterOrDigit(c) || c == '_';
