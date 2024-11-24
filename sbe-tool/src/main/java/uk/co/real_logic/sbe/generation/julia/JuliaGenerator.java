@@ -231,7 +231,7 @@ public class JuliaGenerator implements CodeGenerator
             indent + "@inline function %2$s!(m::%1$s, count)\n" +
             indent + "    return %3$sEncoder(m.buffer, count, sbe_position_ptr(m), sbe_acting_version(m))\n" +
             indent + "end\n" +
-            indent + "%2$s_count!(m::%1$s, count) = %2$s!(m, count)\n",
+            indent + "%2$s_group_count!(m::%1$s, count) = %2$s!(m, count)\n",
             outerStructName,
             propertyName,
             groupStructName);
@@ -1434,11 +1434,14 @@ public class JuliaGenerator implements CodeGenerator
             "    return %1$s(buffer, offset, position, acting_block_length, acting_version)\n" +
             "end\n\n" +
             "@inline function %1$sDecoder(buffer, offset, acting_block_length, acting_version)\n" +
-            "    position = Ref{Int64}(offset + acting_block_length)\n" +
-            "    return %1$s(buffer, offset, position, acting_block_length, acting_version)\n" +
+            "    return %1$s(buffer, offset, acting_block_length, acting_version)\n" +
             "end\n\n" +
             "@inline function %1$sDecoder(buffer, offset, hdr::MessageHeader)\n" +
             "    return %1$sDecoder(buffer, offset + sbe_encoded_length(hdr),\n" +
+            "        Int64(blockLength(hdr)), Int64(version(hdr)))\n" +
+            "end\n\n" +
+            "@inline function %1$sDecoder(buffer, hdr::MessageHeader)\n" +
+            "    return %1$sDecoder(buffer, sbe_encoded_length(hdr),\n" +
             "        Int64(blockLength(hdr)), Int64(version(hdr)))\n" +
             "end\n\n" +
             "@inline function %1$sEncoder(buffer, offset=0)\n" +
@@ -1450,6 +1453,13 @@ public class JuliaGenerator implements CodeGenerator
             "    schemaId!(hdr, %4$s)\n" +
             "    version!(hdr, %5$s)\n" +
             "    return %1$s(buffer, offset + sbe_encoded_length(hdr), %2$s, %5$s)\n" +
+            "end\n\n" +
+            "@inline function %1$sEncoder(buffer, hdr::MessageHeader)\n" +
+            "    blockLength!(hdr, %2$s)\n" +
+            "    templateId!(hdr, %3$s)\n" +
+            "    schemaId!(hdr, %4$s)\n" +
+            "    version!(hdr, %5$s)\n" +
+            "    return %1$s(buffer, sbe_encoded_length(hdr), %2$s, %5$s)\n" +
             "end\n\n" +
 
             "sbe_buffer(m::%1$s) = m.buffer\n" +
