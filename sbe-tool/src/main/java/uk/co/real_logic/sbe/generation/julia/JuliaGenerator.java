@@ -78,18 +78,16 @@ public class JuliaGenerator implements CodeGenerator
     private void generateGroupStruct(
         final StringBuilder sb,
         final String groupStructName,
-        final String indent,
-        final List<Token> fields,
-        final List<Token> groups)
+        final String indent)
     {
         new Formatter(sb).format("\n" +
-            indent + "mutable struct %1$s{T<:AbstractArray{UInt8},R<:Ref{Int64}}\n" +
-            indent + "    buffer::T\n" +
+            indent + "mutable struct %1$s{T<:AbstractArray{UInt8}}\n" +
+            indent + "    const buffer::T\n" +
             indent + "    offset::Int64\n" +
-            indent + "    position_ptr::R\n" +
-            indent + "    block_length::Int64\n" +
-            indent + "    acting_version::Int64\n" +
-            indent + "    initial_position::Int64\n" +
+            indent + "    const position_ptr::Base.RefValue{Int64}\n" +
+            indent + "    const block_length::Int64\n" +
+            indent + "    const acting_version::Int64\n" +
+            indent + "    const initial_position::Int64\n" +
             indent + "    count::Int64\n" +
             indent + "    index::Int64\n" +
             indent + "end\n",
@@ -158,7 +156,7 @@ public class JuliaGenerator implements CodeGenerator
             indent + "        error(lazy\"index >= count [E108]\")\n" +
             indent + "    end\n" +
             indent + "    g.offset = sbe_position(g)\n" +
-            indent + "    if (g.offset + 1 + g.block_length) > Base.length(g.buffer)\n" +
+            indent + "    if (g.offset + 1 + g.block_length) > length(g.buffer)\n" +
             indent + "        error(lazy\"buffer too short for next group index [E108]\")\n" +
             indent + "    end\n" +
             indent + "    sbe_position!(g, g.offset + g.block_length)\n" +
@@ -230,9 +228,10 @@ public class JuliaGenerator implements CodeGenerator
         }
 
         new Formatter(sb).format("\n" +
-            indent + "@inline function %2$s_count!(m::%1$s, count)\n" +
+            indent + "@inline function %2$s!(m::%1$s, count)\n" +
             indent + "    return %3$sEncoder(m.buffer, count, sbe_position_ptr(m), sbe_acting_version(m))\n" +
-            indent + "end\n",
+            indent + "end\n" +
+            indent + "%2$s_count!(m::%1$s, count) = %2$s!(m, count)\n",
             outerStructName,
             propertyName,
             groupStructName);
@@ -317,11 +316,14 @@ public class JuliaGenerator implements CodeGenerator
             typeName);
     }
 
-    private CharSequence generateEnumDeclaration(final String name, final Token encodingToken)
+    private void generateEnumDeclaration(
+        final StringBuilder sb,
+        final String name,
+        final Token encodingToken)
     {
         final Encoding encoding = encodingToken.encoding();
         addModuleToUsing("EnumX");
-        return "@enumx T=SbeEnum " + name + "::" + juliaTypeName(encoding.primitiveType()) + " begin\n";
+        sb.append("@enumx T=SbeEnum " + name + "::" + juliaTypeName(encoding.primitiveType()) + " begin\n");
     }
 
     private static void generateFieldMetaAttributeMethod(
@@ -341,26 +343,26 @@ public class JuliaGenerator implements CodeGenerator
         if (!Strings.isEmpty(epoch))
         {
             new Formatter(sb).format(
-                indent + "    meta_attribute === :epoch && return :%1$s\n",
+                indent + "    meta_attribute === :epoch && return Symbol(\"%1$s\")\n",
                 epoch);
         }
 
         if (!Strings.isEmpty(timeUnit))
         {
             new Formatter(sb).format(
-                indent + "    meta_attribute === :time_unit && return :%1$s\n",
+                indent + "    meta_attribute === :time_unit && return Symbol(\"%1$s\")\n",
                 timeUnit);
         }
 
         if (!Strings.isEmpty(semanticType))
         {
             new Formatter(sb).format(
-                indent + "    meta_attribute === :semantic_type && return :%1$s\n",
+                indent + "    meta_attribute === :semantic_type && return Symbol(\"%1$s\")\n",
                 semanticType);
         }
 
         new Formatter(sb).format(
-            indent + "    meta_attribute === :presence && return :%1$s\n",
+            indent + "    meta_attribute === :presence && return Symbol(\"%1$s\")\n",
             encoding.presence().toString().toLowerCase());
 
         new Formatter(sb).format(
@@ -550,14 +552,14 @@ public class JuliaGenerator implements CodeGenerator
 
                 final StringBuilder sb = new StringBuilder();
 
-                sb.append(generateMessageFlyweightStruct(structName, fields, groups));
-                sb.append(generateMessageFlyweightMethods(structName, msgToken));
+                generateMessageFlyweightStruct(sb, structName, fields, groups);
+                generateMessageFlyweightMethods(sb, structName, msgToken);
 
                 generateFields(sb, structName, fields, BASE_INDENT);
-                generateGroups(sb, groups, BASE_INDENT, structName);
+                generateGroups(sb, structName, groups, BASE_INDENT);
                 generateVarData(sb, structName, varData, BASE_INDENT);
-                generateDisplay(sb, msgToken.name(), structName, fields, groups, varData, INDENT);
-                sb.append(generateMessageLength(groups, varData, BASE_INDENT, structName));
+                generateDisplay(sb, structName, fields, groups, varData, INDENT);
+                generateMessageLength(sb, groups, varData, BASE_INDENT, structName);
 
                 out.append(generateFileHeader());
                 out.append(sb);
@@ -596,9 +598,9 @@ public class JuliaGenerator implements CodeGenerator
 
     private void generateGroups(
         final StringBuilder sb,
+        final String outerStructName,
         final List<Token> tokens,
-        final String indent,
-        final String outerStructName)
+        final String indent)
     {
         for (int i = 0, size = tokens.size(); i < size; i++)
         {
@@ -626,14 +628,14 @@ public class JuliaGenerator implements CodeGenerator
             final List<Token> varData = new ArrayList<>();
             i = collectVarData(tokens, i, varData);
 
-            generateGroupStruct(sb, groupStructName, indent, fields, groups);
+            generateGroupStruct(sb, groupStructName, indent);
             generateGroupMethods(sb, groupStructName, tokens, groupStart, indent);
             generateFields(sb, groupStructName, fields, indent);
-            generateGroups(sb, groups, indent, groupStructName);
+            generateGroups(sb, groupStructName, groups, indent);
             generateVarData(sb, groupStructName, varData, indent);
 
-            sb.append(generateGroupDisplay(groupStructName, fields, groups, varData, indent));
-            sb.append(generateMessageLength(groups, varData, indent, groupStructName));
+            generateGroupDisplay(sb, groupStructName, fields, groups, varData, indent);
+            generateMessageLength(sb, groups, varData, indent, groupStructName);
 
             generateGroupProperty(sb, groupName, outerStructName, groupToken, indent);
         }
@@ -698,9 +700,9 @@ public class JuliaGenerator implements CodeGenerator
                 structName);
 
             new Formatter(sb).format("\n" +
-                indent + "@inline function %1$s_length!(m::%4$s, n)\n" +
+                indent + "@inline function %1$s_length!(m::%5$s, n)\n" +
                 "%2$s" +
-                indent + "    if !checkbounds(Bool, m.buffer, sbe_position(m) + 1 + 4 + n)\n" +
+                indent + "    if !checkbounds(Bool, m.buffer, sbe_position(m) + 1 + %4$d + n)\n" +
                 indent + "        error(lazy\"buffer too short for data length\")\n" +
                 indent + "    end\n" +
                 indent + "    return %3$s\n" +
@@ -708,6 +710,7 @@ public class JuliaGenerator implements CodeGenerator
                 propertyName,
                 generateArrayLengthNotPresentCondition(version, BASE_INDENT),
                 generatePut(lengthToken, "m.buffer", "sbe_position(m)", "n"),
+                lengthOfLengthField,
                 structName);
 
             new Formatter(sb).format("\n" +
@@ -749,19 +752,24 @@ public class JuliaGenerator implements CodeGenerator
             }
 
             new Formatter(sb).format("\n" +
-                indent + "@inline function Base.resize!(m::%3$s, n)\n" +
+                indent + "@inline function %1$s!(m::%3$s, len::Int)\n" +
                 "%5$s" +
-                indent + "    %1$s_length!(m, n)\n" +
-                indent + "    return %1$s(m)\n" +
-                indent + "end\n" +
-                indent + "\n" +
-                indent + "@inline function %1$s!(m::%3$s, src::T) where {T<:AbstractArray{%4$s}}\n" +
-                "%5$s" +
-                indent + "    len = Base.length(src)\n" +
                 indent + "    %1$s_length!(m, len)\n" +
                 indent + "    pos = sbe_position(m) + %2$d\n" +
-                indent + "    dest = reinterpret(%4$s, view(m.buffer, pos+1:pos+len))\n" +
                 indent + "    sbe_position!(m, pos + len)\n" +
+                indent + "    return @inbounds reinterpret(%4$s, view(m.buffer, pos+1:pos+len))\n" +
+                indent + "end\n",
+                propertyName,
+                lengthOfLengthField,
+                structName,
+                varDataJuliaType,
+                generateTypeFieldNotPresentCondition(version, varDataJuliaType, indent));
+
+            new Formatter(sb).format("\n" +
+                indent + "@inline function %1$s!(m::%3$s, src::AbstractArray{%4$s})\n" +
+                "%5$s" +
+                indent + "    len = length(src)\n" +
+                indent + "    dest = %1$s!(m, len)\n" +
                 indent + "    if len != 0\n" +
                 indent + "        copyto!(dest, src)\n" +
                 indent + "    end\n" +
@@ -786,8 +794,8 @@ public class JuliaGenerator implements CodeGenerator
         {
             final StringBuilder out = new StringBuilder();
 
-            out.append(generateFixedFlyweightStruct(choiceName, tokens));
-            out.append(generateFixedFlyweightMethods(choiceName, tokens));
+            generateFixedFlyweightStruct(out, choiceName, tokens);
+            generateFixedFlyweightMethods(out, choiceName, tokens);
 
             final Encoding encoding = token.encoding();
             new Formatter(out).format("\n" +
@@ -805,8 +813,8 @@ public class JuliaGenerator implements CodeGenerator
                 choiceName,
                 generateGet(token, "m.buffer", "m.offset"));
 
-            out.append(generateChoices(choiceName, tokens.subList(1, tokens.size() - 1)));
-            out.append(generateChoicesDisplay(choiceName, tokens.subList(1, tokens.size() - 1)));
+            generateChoices(out, choiceName, tokens.subList(1, tokens.size() - 1));
+            generateChoicesDisplay(out, choiceName, tokens.subList(1, tokens.size() - 1));
             out.append("\n");
 
             fileOut.append(generateFileHeader());
@@ -823,9 +831,8 @@ public class JuliaGenerator implements CodeGenerator
         {
             final StringBuilder out = new StringBuilder();
 
-            out.append(generateEnumDeclaration(enumName, enumToken));
-
-            out.append(generateEnumValues(tokens.subList(1, tokens.size() - 1), enumToken));
+            generateEnumDeclaration(out, enumName, enumToken);
+            generateEnumValues(out, tokens.subList(1, tokens.size() - 1), enumToken);
 
             fileOut.append(generateFileHeader());
             fileOut.append(out);
@@ -840,24 +847,21 @@ public class JuliaGenerator implements CodeGenerator
         {
             final StringBuilder out = new StringBuilder();
 
-            out.append(generateFixedFlyweightStruct(compositeName, tokens));
-            out.append(generateFixedFlyweightMethods(compositeName, tokens));
-
-            out.append(generateCompositePropertyElements(
-                compositeName, tokens.subList(1, tokens.size() - 1), BASE_INDENT));
-
-            out.append(generateCompositeDisplay(
-                tokens.get(0).applicableTypeName(), tokens.subList(1, tokens.size() - 1)));
+            generateFixedFlyweightStruct(out, compositeName, tokens);
+            generateFixedFlyweightMethods(out, compositeName, tokens);
+            generateCompositePropertyElements(out, compositeName, tokens.subList(1, tokens.size() - 1), BASE_INDENT);
+            generateCompositeDisplay(out, tokens.get(0).applicableTypeName(), tokens.subList(1, tokens.size() - 1));
 
             fileOut.append(generateFileHeader());
             fileOut.append(out);
         }
     }
 
-    private CharSequence generateChoices(final String bitsetStructName, final List<Token> tokens)
+    private void generateChoices(
+        final StringBuilder sb,
+        final String bitsetStructName,
+        final List<Token> tokens)
     {
-        final StringBuilder sb = new StringBuilder();
-
         tokens
             .stream()
             .filter((token) -> token.signal() == Signal.CHOICE)
@@ -900,15 +904,13 @@ public class JuliaGenerator implements CodeGenerator
                     constantOne,
                     generateGet(token, "m.buffer", "m.offset"));
             });
-
-        return sb;
     }
 
-    private CharSequence generateEnumValues(
+    private void generateEnumValues(
+        final StringBuilder sb,
         final List<Token> tokens,
         final Token encodingToken)
     {
-        final StringBuilder sb = new StringBuilder();
         final Encoding encoding = encodingToken.encoding();
 
         for (final Token token : tokens)
@@ -926,16 +928,16 @@ public class JuliaGenerator implements CodeGenerator
             encoding.primitiveType(), encoding.applicableNullValue().toString());
 
         new Formatter(sb).format(
-            "    NULL_VALUE = %2$s\n",
+            "    NULL_VALUE = %1$s\n",
             nullLiteral);
 
         sb.append("end\n");
-
-        return sb;
     }
 
     private CharSequence generateFieldNotPresentCondition(
-        final int sinceVersion, final Encoding encoding, final String indent)
+        final int sinceVersion,
+        final Encoding encoding,
+        final String indent)
     {
         if (0 == sinceVersion)
         {
@@ -1003,11 +1005,12 @@ public class JuliaGenerator implements CodeGenerator
         return sb;
     }
 
-    private CharSequence generateCompositePropertyElements(
-        final String containingStructName, final List<Token> tokens, final String indent)
+    private void generateCompositePropertyElements(
+        final StringBuilder sb,
+        final String containingStructName,
+        final List<Token> tokens,
+        final String indent)
     {
-        final StringBuilder sb = new StringBuilder();
-
         for (int i = 0; i < tokens.size(); )
         {
             final Token fieldToken = tokens.get(i);
@@ -1040,8 +1043,6 @@ public class JuliaGenerator implements CodeGenerator
 
             i += tokens.get(i).componentTokenCount();
         }
-
-        return sb;
     }
 
     private void generatePrimitiveProperty(
@@ -1358,20 +1359,22 @@ public class JuliaGenerator implements CodeGenerator
         }
     }
 
-    private CharSequence generateFixedFlyweightStruct(
+    private void generateFixedFlyweightStruct(
+        final StringBuilder sb,
         final String structName,
         final List<Token> fields)
     {
-        return String.format(
+        new Formatter(sb).format(
             "struct %1$s{T<:AbstractArray{UInt8}}\n" +
-                "    buffer::T\n" +
-                "    offset::Int64\n" +
-                "    acting_version::Int64\n" +
-                "end\n",
+            "    buffer::T\n" +
+            "    offset::Int64\n" +
+            "    acting_version::Int64\n" +
+            "end\n",
             structName);
     }
 
-    private CharSequence generateFixedFlyweightMethods(
+    private void generateFixedFlyweightMethods(
+        final StringBuilder sb,
         final String structName,
         final List<Token> fields)
     {
@@ -1382,48 +1385,50 @@ public class JuliaGenerator implements CodeGenerator
             sizeValue = "typemax(UInt64)";
         }
 
-        return String.format("\n" +
-                "function %1$s(buffer, offset, acting_version)\n" +
-                "    checkbounds(buffer, offset + 1 + %2$s)\n" +
-                "    return %1$s(buffer, offset, acting_version)\n" +
-                "end\n\n" +
+        new Formatter(sb).format("\n" +
+            "function %1$s(buffer, offset, acting_version)\n" +
+            "    checkbounds(buffer, offset + 1 + %2$s)\n" +
+            "    return %1$s(buffer, offset, acting_version)\n" +
+            "end\n\n" +
 
-                "sbe_encoded_length(::%1$s) = %2$s\n" +
-                "sbe_buffer(m::%1$s) = m.buffer\n" +
-                "sbe_offset(m::%1$s) = m.offset\n" +
-                "sbe_acting_version(m::%1$s) = m.acting_version\n" +
-                "sbe_schema_id(::%1$s) = %3$s\n" +
-                "sbe_schema_version(::%1$s) = %4$s\n",
+            "sbe_buffer(m::%1$s) = m.buffer\n" +
+            "sbe_offset(m::%1$s) = m.offset\n" +
+            "sbe_acting_version(m::%1$s) = m.acting_version\n" +
+            "sbe_encoded_length(::%1$s) = %2$s\n" +
+            "sbe_schema_id(::%1$s) = %3$s\n" +
+            "sbe_schema_version(::%1$s) = %4$s\n",
             structName,
             sizeValue,
             Integer.toString(ir.id()),
             Integer.toString(ir.version()));
     }
 
-    private CharSequence generateMessageFlyweightStruct(
+    private void generateMessageFlyweightStruct(
+        final StringBuilder sb,
         final String structName,
         final List<Token> fields,
         final List<Token> groups)
     {
-        return String.format(
-            "struct %1$s{T<:AbstractArray{UInt8},R<:Ref{Int64}}\n" +
+        new Formatter(sb).format(
+            "struct %1$s{T<:AbstractArray{UInt8}}\n" +
             "    buffer::T\n" +
             "    offset::Int64\n" +
-            "    position_ptr::R\n" +
+            "    position_ptr::Base.RefValue{Int64}\n" +
             "    acting_block_length::Int64\n" +
             "    acting_version::Int64\n" +
             "end\n",
             structName);
     }
 
-    private CharSequence generateMessageFlyweightMethods(
+    private void generateMessageFlyweightMethods(
+        final StringBuilder sb,
         final String structName,
         final Token token)
     {
         final String semanticType = token.encoding().semanticType() == null ? "" : token.encoding().semanticType();
         final String semanticVersion = ir.semanticVersion() == null ? "" : ir.semanticVersion();
 
-        return String.format(
+        new Formatter(sb).format("\n" +
             "@inline function %1$s(buffer, offset, acting_block_length, acting_version)\n" +
             "    position = Ref{Int64}(offset + acting_block_length)\n" +
             "    return %1$s(buffer, offset, position, acting_block_length, acting_version)\n" +
@@ -1449,11 +1454,12 @@ public class JuliaGenerator implements CodeGenerator
 
             "sbe_buffer(m::%1$s) = m.buffer\n" +
             "sbe_offset(m::%1$s) = m.offset\n" +
+            "sbe_position_ptr(m::%1$s) = m.position_ptr\n" +
+            "sbe_acting_block_length(m::%1$s) = m.acting_block_length\n" +
             "sbe_acting_version(m::%1$s) = m.acting_version\n" +
             "sbe_position(m::%1$s) = m.position_ptr[]\n" +
-            "@inline sbe_position!(m::%1$s, position) = m.position_ptr[] = sbe_check_position(m, position)\n" +
-            "sbe_position_ptr(m::%1$s) = m.position_ptr\n" +
             "@inline sbe_check_position(m::%1$s, position) = (checkbounds(m.buffer, position + 1); position)\n" +
+            "@inline sbe_position!(m::%1$s, position) = m.position_ptr[] = sbe_check_position(m, position)\n" +
             "sbe_block_length(::%1$s) = %2$s\n" +
             "sbe_template_id(::%1$s) = %3$s\n" +
             "sbe_schema_id(::%1$s) = %4$s\n" +
@@ -1672,7 +1678,6 @@ public class JuliaGenerator implements CodeGenerator
 
     private void generateDisplay(
         final StringBuilder sb,
-        final String containingStructName,
         final String name,
         final List<Token> fields,
         final List<Token> groups,
@@ -1686,46 +1691,51 @@ public class JuliaGenerator implements CodeGenerator
             "    println(io, \"SbeTemplateId:  \", sbe_template_id(writer))\n" +
             "    println(io, \"SbeSchemaId:    \", sbe_schema_id(writer))\n" +
             "    println(io, \"SbeSchemaVersion: \", sbe_schema_version(writer))\n" +
+            "\n" +
             "    sbe_rewind!(writer)\n" +
             "%2$s" +
             "    sbe_rewind!(writer)\n" +
+            "    nothing\n" +
             "end\n",
             formatStructName(name),
-            appendDisplay(containingStructName, fields, groups, varData, indent));
+            appendDisplay(fields, groups, varData, indent));
     }
 
 
-    private CharSequence generateGroupDisplay(
+    private void generateGroupDisplay(
+        final StringBuilder sb,
         final String groupStructName,
         final List<Token> fields,
         final List<Token> groups,
         final List<Token> varData,
         final String indent)
     {
-        return String.format("\n" +
+        new Formatter(sb).format("\n" +
             "function print_fields(io::IO, writer::%1$s{T}) where {T}\n" +
             "    println(io, \"%1$s view over a type $T\")\n" +
             "%2$s" +
             "end\n",
             groupStructName,
-            appendDisplay(groupStructName, fields, groups, varData, indent + INDENT));
+            appendDisplay(fields, groups, varData, indent + INDENT));
     }
 
 
-    private CharSequence generateCompositeDisplay(final String name, final List<Token> tokens)
+    private void generateCompositeDisplay(
+        final StringBuilder sb,
+        final String name,
+        final List<Token> tokens)
     {
-        return String.format("\n" +
+        new Formatter(sb).format("\n" +
             "function print_fields(io::IO, writer::%1$s{T}) where {T}\n" +
             "    println(io, \"%1$s view over a type $T\")\n" +
             "%2$s" +
             "end\n",
             formatStructName(name),
-            appendDisplay(formatStructName(name), tokens, new ArrayList<>(), new ArrayList<>(), INDENT));
+            appendDisplay(tokens, new ArrayList<>(), new ArrayList<>(), INDENT));
     }
 
 
     private CharSequence appendDisplay(
-        final String containingStructName,
         final List<Token> fields,
         final List<Token> groups,
         final List<Token> varData,
@@ -1804,9 +1814,11 @@ public class JuliaGenerator implements CodeGenerator
                 final String fieldName = formatPropertyName(varDataToken.name());
 
                 new Formatter(sb).format(
-                    indent + "println(io, %s(StringView, writer))\n\n",
+                    indent + "println(io, %s(StringView, writer))\n",
                     fieldName);
             }
+
+            sb.append("\n");
 
             i += varDataToken.componentTokenCount();
         }
@@ -1892,11 +1904,11 @@ public class JuliaGenerator implements CodeGenerator
     }
 
 
-    private CharSequence generateChoicesDisplay(
+    private void generateChoicesDisplay(
+        final StringBuilder sb,
         final String name,
         final List<Token> tokens)
     {
-        final StringBuilder sb = new StringBuilder();
         final List<Token> choiceTokens = new ArrayList<>();
 
         collect(Signal.CHOICE, tokens, 0, choiceTokens);
@@ -1938,11 +1950,10 @@ public class JuliaGenerator implements CodeGenerator
         new Formatter(sb).format(
             "    print(io, \"]\")\n" +
             "end\n");
-
-        return sb;
     }
 
-    private CharSequence generateMessageLength(
+    private void generateMessageLength(
+        final StringBuilder sb,
         final List<Token> groups,
         final List<Token> varData,
         final String indent,
@@ -1985,15 +1996,11 @@ public class JuliaGenerator implements CodeGenerator
             i += varDataToken.componentTokenCount();
         }
 
-        final StringBuilder sb = new StringBuilder();
-
         new Formatter(sb).format("\n" +
             indent + "@inline function skip!(m::%1$s)\n" +
             sbSkip +
             indent + "    return\n" +
             indent + "end\n",
             structName);
-
-        return sb;
     }
 }
