@@ -596,6 +596,10 @@ public class JuliaGenerator implements CodeGenerator
                 "    pos = findfirst(iszero, a)\n" +
                 "    len = pos !== nothing ? pos - 1 : Base.length(a)\n" +
                 "    return view(a, 1:len)\n" +
+                "end\n\n" +
+                "mutable struct SbeCodecContext\n" +
+                "    position_ptr::Base.RefValue{Int64}\n" +
+                "    SbeCodecContext() = new(Base.Ref{Int64}(0))\n" +
                 "end\n");
 
             out.append(generateFileHeader());
@@ -1389,7 +1393,6 @@ public class JuliaGenerator implements CodeGenerator
             "struct %1$s{T<:AbstractArray{UInt8}}\n" +
             "    buffer::T\n" +
             "    offset::Int64\n" +
-            "    acting_version::Int64\n" +
             "end\n",
             structName);
     }
@@ -1407,15 +1410,14 @@ public class JuliaGenerator implements CodeGenerator
         }
 
         new Formatter(sb).format("\n" +
-            "function %1$s(buffer, offset, acting_version)\n" +
+            "function %1$s(buffer, offset)\n" +
             "    checkbounds(buffer, offset + 1 + %2$s)\n" +
-            "    return %1$s(buffer, offset, acting_version)\n" +
+            "    return %1$s(buffer, offset)\n" +
             "end\n" +
             "%1$s() = %1$s(UInt8[], 0, 0)\n\n" +
 
             "sbe_buffer(m::%1$s) = @inbounds view(m.buffer, m.offset+1:m.offset+%2$s)\n" +
             "sbe_offset(m::%1$s) = m.offset\n" +
-            "sbe_acting_version(m::%1$s) = m.acting_version\n" +
             "sbe_encoded_length(::%1$s) = %2$s\n" +
             "sbe_schema_id(::%1$s) = %3$s\n" +
             "sbe_schema_version(::%1$s) = %4$s\n",
@@ -1452,10 +1454,10 @@ public class JuliaGenerator implements CodeGenerator
 
         new Formatter(sb).format("\n" +
             "@inline function %1$s(buffer, offset, acting_block_length, acting_version)\n" +
-            "    position_ptr = Ref{Int64}(offset + acting_block_length)\n" +
+            "    position_ptr[] = offset + acting_block_length\n" +
             "    return %1$s(buffer, offset, position_ptr, acting_block_length, acting_version)\n" +
             "end\n" +
-            "%1$s() = %1$s(UInt8[], 0, 0, 0)\n\n" +
+            "%1$s() = %1$s(SbeCodecContext(), UInt8[], 0, 0, 0)\n\n" +
             "@inline function %1$sDecoder(buffer, offset, acting_block_length, acting_version)\n" +
             "    return %1$s(buffer, offset, acting_block_length, acting_version)\n" +
             "end\n\n" +
