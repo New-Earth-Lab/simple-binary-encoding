@@ -16,8 +16,8 @@
 package uk.co.real_logic.sbe.generation.julia;
 
 import static uk.co.real_logic.sbe.generation.Generators.toUpperFirstChar;
-import static uk.co.real_logic.sbe.generation.julia.JuliaUtil.formatStructName;
 import static uk.co.real_logic.sbe.generation.julia.JuliaUtil.formatPropertyName;
+import static uk.co.real_logic.sbe.generation.julia.JuliaUtil.formatStructName;
 import static uk.co.real_logic.sbe.generation.julia.JuliaUtil.juliaTypeName;
 import static uk.co.real_logic.sbe.ir.GenerationUtil.collect;
 import static uk.co.real_logic.sbe.ir.GenerationUtil.collectFields;
@@ -86,18 +86,18 @@ public class JuliaGenerator implements CodeGenerator
             indent + "    buffer::T\n" +
             indent + "    offset::Int64\n" +
             indent + "    position_ptr::Base.RefValue{Int64}\n" +
-            indent + "    block_length::Int64\n" +
-            indent + "    acting_version::Int64\n" +
-            indent + "    count::Int64\n" +
-            indent + "    index::Int64\n" +
+            indent + "    block_length::UInt16\n" +
+            indent + "    acting_version::UInt16\n" +
+            indent + "    count::UInt16\n" +
+            indent + "    index::UInt16\n" +
             indent + "end\n\n" +
             indent + "struct %1$sEncoder{T<:AbstractArray{UInt8}} <: %1$s{T}\n" +
             indent + "    buffer::T\n" +
             indent + "    offset::Int64\n" +
             indent + "    position_ptr::Base.RefValue{Int64}\n" +
             indent + "    initial_position::Int64\n" +
-            indent + "    count::Int64\n" +
-            indent + "    index::Int64\n" +
+            indent + "    count::UInt16\n" +
+            indent + "    index::UInt16\n" +
             indent + "end\n",
             groupStructName);
     }
@@ -118,8 +118,8 @@ public class JuliaGenerator implements CodeGenerator
             indent + "@inline function %1$sDecoder(buffer, position_ptr, acting_version)\n" +
             indent + "    dimensions = %2$s(buffer, position_ptr[])\n" +
             indent + "    position_ptr[] += %3$d\n" +
-            indent + "    return %1$sDecoder(buffer, 0, position_ptr, Int64(blockLength(dimensions)),\n" +
-            indent + "        acting_version, Int64(numInGroup(dimensions)), 0)\n" +
+            indent + "    return %1$sDecoder(buffer, 0, position_ptr, blockLength(dimensions),\n" +
+            indent + "        acting_version, numInGroup(dimensions), 0)\n" +
             indent + "end\n",
             groupStructName,
             dimensionsStructName,
@@ -131,7 +131,7 @@ public class JuliaGenerator implements CodeGenerator
         new Formatter(sb).format("\n" +
             indent + "@inline function %1$sEncoder(buffer, count, position_ptr)\n" +
             indent + "    if %2$scount > %3$d\n" +
-            indent + "        error(\"count outside of allowed range [E110]\")\n" +
+            indent + "        error(\"count outside of allowed range\")\n" +
             indent + "    end\n" +
             indent + "    dimensions = %4$s(buffer, position_ptr[])\n" +
             indent + "    blockLength!(dimensions, %5$d)\n" +
@@ -153,17 +153,15 @@ public class JuliaGenerator implements CodeGenerator
             indent + "sbe_acting_block_length(g::%3$sDecoder) = g.block_length\n" +
             indent + "sbe_acting_version(g::%3$sDecoder) = g.acting_version\n" +
             indent + "sbe_position(g::%3$s) = g.position_ptr[]\n" +
-            indent + "@inline sbe_position!(g::%3$s, position) = g.position_ptr[] = sbe_check_position(g, position)\n" +
+            indent + "@inline sbe_position!(g::%3$s, position) = g.position_ptr[] = position\n" +
             indent + "sbe_position_ptr(g::%3$s) = g.position_ptr\n" +
-            indent + "@inline sbe_check_position(g::%3$s, position) = " +
-            indent + "(checkbounds(g.buffer, position + 1); position)\n" +
             indent + "@inline function next!(g::%3$s)\n" +
             indent + "    if g.index >= g.count\n" +
-            indent + "        error(\"index >= count [E108]\")\n" +
+            indent + "        error(\"index >= count\")\n" +
             indent + "    end\n" +
             indent + "    offset = sbe_position(g)\n" +
             indent + "    if (offset + 1 + g.block_length) > Base.length(g.buffer)\n" +
-            indent + "        error(\"buffer too short for next group index [E108]\")\n" +
+            indent + "        error(\"buffer too short for next group index\")\n" +
             indent + "    end\n" +
             indent + "    sbe_position!(g, offset + g.block_length)\n" +
             indent + "    return %3$s(g.buffer, offset, g.position_ptr, g.block_length,\n" +
@@ -199,7 +197,7 @@ public class JuliaGenerator implements CodeGenerator
             dimensionsStructName);
     }
 
-    private static void generateGroupProperty(
+    private void generateGroupProperty(
         final StringBuilder sb,
         final String groupName,
         final String outerStructName,
@@ -209,6 +207,7 @@ public class JuliaGenerator implements CodeGenerator
         final String propertyName = formatPropertyName(groupName);
         final String groupStructName = formatStructName(groupName);
         final int version = token.version();
+        final int id = token.id();
 
         if (version > 0)
         {
@@ -246,14 +245,14 @@ public class JuliaGenerator implements CodeGenerator
             groupStructName);
 
         new Formatter(sb).format(
-            indent + "%1$s_id(::%3$s) = %2$d\n",
+            indent + "%1$s_id(::%3$s) = %2$s\n",
             propertyName,
-            token.id(),
+            id,
             outerStructName);
 
         new Formatter(sb).format(
-            indent + "%1$s_since_version(::%3$s) = %2$d\n" +
-            indent + "%1$s_in_acting_version(m::%3$s) = sbe_acting_version(m) >= %2$d\n",
+            indent + "%1$s_since_version(::%3$s) = %2$s\n" +
+            indent + "%1$s_in_acting_version(m::%3$s) = sbe_acting_version(m) >= %2$s\n",
             propertyName,
             version,
             outerStructName);
@@ -375,7 +374,7 @@ public class JuliaGenerator implements CodeGenerator
             encoding.presence().toString().toLowerCase());
 
         new Formatter(sb).format(
-            indent + "    error(lazy\"unknown attribute: $meta_attribute\")\n" +
+            indent + "    return Symbol(\"\")\n" +
             indent + "end\n");
     }
 
@@ -429,7 +428,7 @@ public class JuliaGenerator implements CodeGenerator
         final int offset = token.offset();
 
         new Formatter(sb).format(
-            indent + "%2$s(m::%4$s) = %1$s(m.buffer, m.offset + %3$d)\n",
+            indent + "%2$s(m::%4$s) = %1$s(m.buffer, m.offset + %3$d, sbe_acting_version(m))\n",
             compositeName,
             propertyName,
             offset,
@@ -561,7 +560,7 @@ public class JuliaGenerator implements CodeGenerator
 
                 final StringBuilder sb = new StringBuilder();
 
-                generateMessageFlyweightStruct(sb, structName, fields, groups);
+                generateMessageFlyweightStruct(sb, structName, fields, groups, msgToken);
                 generateMessageFlyweightMethods(sb, structName, msgToken);
 
                 generateFields(sb, structName, fields, BASE_INDENT);
@@ -586,7 +585,7 @@ public class JuliaGenerator implements CodeGenerator
         {
             final StringBuilder sb = new StringBuilder();
 
-            new Formatter(sb).format(
+            sb.append(
                 "@inline function encode_le(::Type{T}, buffer, offset, value) where {T}\n" +
                 "    @inbounds reinterpret(T, view(buffer, offset+1:offset+sizeof(T)))[] = htol(value)\n" +
                 "end\n\n" +
@@ -603,14 +602,7 @@ public class JuliaGenerator implements CodeGenerator
                 "    pos = findfirst(iszero, a)\n" +
                 "    len = pos !== nothing ? pos - 1 : Base.length(a)\n" +
                 "    return view(a, 1:len)\n" +
-                "end\n\n" +
-                "struct SbeCodecContext\n" +
-                "    position_ptr::Base.RefValue{Int64}\n" +
-                "    SbeCodecContext() = new(Ref(0))\n" +
-                "end\n" +
-                "sbe_position_ptr(c::SbeCodecContext) = c.position_ptr\n" +
-                "sbe_position!(c::SbeCodecContext, position) = c.position_ptr[] = position\n" +
-                "sbe_position(c::SbeCodecContext) = c.position_ptr[]\n\n");
+                "end\n\n");
 
             out.append(generateFileHeader());
             out.append(sb);
@@ -724,6 +716,8 @@ public class JuliaGenerator implements CodeGenerator
                 "%2$s" +
                 indent + "    if !checkbounds(Bool, m.buffer, sbe_position(m) + 1 + %4$d + n)\n" +
                 indent + "        error(\"buffer too short for data length\")\n" +
+                indent + "    elseif n > %6$d\n" +
+                indent + "        error(\"data length too large for length type\")\n" +
                 indent + "    end\n" +
                 indent + "    return %3$s\n" +
                 indent + "end\n",
@@ -731,7 +725,8 @@ public class JuliaGenerator implements CodeGenerator
                 generateArrayLengthNotPresentCondition(version, BASE_INDENT),
                 generatePut(lengthToken, "m.buffer", "sbe_position(m)", "n"),
                 lengthOfLengthField,
-                structName);
+                structName,
+                lengthToken.encoding().applicableMaxValue().longValue());
 
             new Formatter(sb).format("\n" +
                 indent + "@inline function skip_%1$s!(m::%4$s)\n" +
@@ -747,12 +742,12 @@ public class JuliaGenerator implements CodeGenerator
                 structName);
 
             new Formatter(sb).format("\n" +
-                indent + "@inline function %1$s(m::%6$s)\n" +
+                indent + "@inline function %1$s(m::%6$sDecoder)\n" +
                 "%2$s" +
                 indent + "    len = %1$s_length(m)\n" +
                 indent + "    pos = sbe_position(m) + %3$d\n" +
                 indent + "    sbe_position!(m, pos + len)\n" +
-                indent + "    return @inbounds view(m.buffer, pos+1:pos+len)\n" +
+                indent + "    return view(m.buffer, pos+1:pos+len)\n" +
                 indent + "end\n",
                 propertyName,
                 generateTypeFieldNotPresentCondition(version, "T", indent),
@@ -765,8 +760,7 @@ public class JuliaGenerator implements CodeGenerator
             {
                 addModuleToUsing("StringViews");
                 new Formatter(sb).format("\n" +
-                    indent + "%1$s(T::Type{<:AbstractString}, m::%2$s) = T(rstrip_nul(%1$s(m)))\n" +
-                    indent + "%1$s_as_string(m::%2$s) = %1$s(StringView, m)\n",
+                    indent + "%1$s(T::Type{<:AbstractString}, m::%2$s) = T(rstrip_nul(%1$s(m)))\n",
                     propertyName,
                     structName);
             }
@@ -777,7 +771,24 @@ public class JuliaGenerator implements CodeGenerator
                 indent + "    %1$s_length!(m, len)\n" +
                 indent + "    pos = sbe_position(m) + %3$d\n" +
                 indent + "    sbe_position!(m, pos + len)\n" +
-                indent + "    return @inbounds view(m.buffer, pos+1:pos+len)\n" +
+                indent + "    return view(m.buffer, pos+1:pos+len)\n" +
+                indent + "end\n",
+                propertyName,
+                generateTypeFieldNotPresentCondition(version, "T", indent),
+                lengthOfLengthField,
+                lengthJuliaType,
+                varDataJuliaType,
+                structName);
+
+            new Formatter(sb).format("\n" +
+                indent + "@inline function %1$s!(m::%6$sEncoder, src)\n" +
+                "%2$s" +
+                indent + "    len = Base.length(src)\n" +
+                indent + "    %1$s_length!(m, len)\n" +
+                indent + "    pos = sbe_position(m) + %3$d\n" +
+                indent + "    sbe_position!(m, pos + len)\n" +
+                indent + "    dest = view(m.buffer, pos+1:pos+len)\n" +
+                indent + "    copyto!(dest, src)\n" +
                 indent + "end\n",
                 propertyName,
                 generateTypeFieldNotPresentCondition(version, "T", indent),
@@ -804,17 +815,17 @@ public class JuliaGenerator implements CodeGenerator
 
             final Encoding encoding = token.encoding();
             new Formatter(out).format("\n" +
-                "@inline clear(m::%1$s)::%1$s = %2$s\n",
+                "@inline clear!(m::%1$sEncoder) = %2$s\n",
                 choiceName,
                 generatePut(token, "m.buffer", "m.offset", "0"));
 
             new Formatter(out).format(
-                "@inline is_empty(m::%1$s) = %2$s == 0\n",
+                "@inline is_empty(m::%1$sDecoder) = %2$s == 0\n",
                 choiceName,
                 generateGet(token, "m.buffer", "m.offset"));
 
             new Formatter(out).format(
-                "@inline raw_value(m::%1$s) = %2$s\n",
+                "@inline raw_value(m::%1$sDecoder) = %2$s\n",
                 choiceName,
                 generateGet(token, "m.buffer", "m.offset"));
 
@@ -879,7 +890,7 @@ public class JuliaGenerator implements CodeGenerator
                 final CharSequence constantOne = generateLiteral(type, "1");
 
                 new Formatter(sb).format("\n" +
-                    "@inline function %2$s(m::%1$s)\n" +
+                    "@inline function %2$s(m::%1$sDecoder)\n" +
                     "%6$s" +
                     "    return %7$s & (%5$s << %4$s) != 0\n" +
                     "end\n",
@@ -892,13 +903,9 @@ public class JuliaGenerator implements CodeGenerator
                     generateGet(token, "m.buffer", "m.offset"));
 
                 new Formatter(sb).format("\n" +
-                    "@inline function %2$s!(m::%1$s, value::Bool)\n" +
+                    "@inline function %2$s!(m::%1$sEncoder, value::Bool)\n" +
                     "    bits = %7$s\n" +
-                    "    if value\n" +
-                    "        bits |= %6$s << %5$s\n" +
-                    "    else\n" +
-                    "        bits &= ~(%6$s << %5$s)\n" +
-                    "    end\n" +
+                    "    bits = value ? (bits | (%6$s << %5$s)) : (bits & ~(%6$s << %5$s))\n" +
                     "    %4$s\n" +
                     "end\n",
                     bitsetStructName,
@@ -1252,7 +1259,7 @@ public class JuliaGenerator implements CodeGenerator
         final int offset = encodingToken.offset();
 
         new Formatter(sb).format("\n" +
-            indent + "@inline function %2$s(m::%1$s)\n" +
+            indent + "@inline function %2$s(m::%1$sDecoder)\n" +
             "%4$s" +
             indent + "    return %5$s\n" +
             indent + "end\n",
@@ -1263,7 +1270,7 @@ public class JuliaGenerator implements CodeGenerator
             generateGet(encodingToken, "m.buffer", "m.offset + " + Integer.toString(offset)));
 
         new Formatter(sb).format(
-            indent + "@inline %2$s!(m::%1$s, value) = %3$s\n",
+            indent + "@inline %2$s!(m::%1$sEncoder, value) = %3$s\n",
             containingStructName,
             propertyName,
             generatePut(encodingToken, "m.buffer", "m.offset + " + Integer.toString(offset), "value"));
@@ -1295,14 +1302,14 @@ public class JuliaGenerator implements CodeGenerator
             formatStructName(containingStructName));
 
         new Formatter(sb).format("\n" +
-            indent + "@inline function %1$s(m::%2$s)\n" +
+            indent + "@inline function %1$s(m::%2$sDecoder)\n" +
             indent + "%3$s" +
-            indent + "    return @inbounds %4$s\n" +
+            indent + "    return %4$s\n" +
             indent + "end\n",
             propertyName,
             formatStructName(containingStructName),
             generateArrayFieldNotPresentCondition(propertyToken.version(), juliaTypeName, indent),
-            generateGetArrayReadWrite(
+            generateGetArrayReadOnly(
             encodingToken,
             juliaTypeName,
             "m.buffer",
@@ -1314,9 +1321,9 @@ public class JuliaGenerator implements CodeGenerator
         {
             addModuleToUsing("StaticArrays");
             new Formatter(sb).format("\n" +
-                indent + "@inline function %1$s_static(m::%2$s)\n" +
+                indent + "@inline function %1$s(::Type{<:SVector},m::%2$sDecoder)\n" +
                 indent + "%3$s" +
-                indent + "    return @inbounds %4$s\n" +
+                indent + "    return %4$s\n" +
                 indent + "end\n",
                 propertyName,
                 formatStructName(containingStructName),
@@ -1330,11 +1337,12 @@ public class JuliaGenerator implements CodeGenerator
 
         if (encodingToken.encoding().primitiveType() == PrimitiveType.CHAR)
         {
+            addModuleToUsing("StringViews");
             new Formatter(sb).format("\n" +
-                indent + "@inline function %2$s(T::Type{<:AbstractString}, m::%6$s)\n" +
+                indent + "@inline function %2$s(::Type{<:AbstractString}, m::%6$sDecoder)\n" +
                 indent + "%4$s" +
-                indent + "    value = @inbounds view(m.buffer, m.offset+1+%5$d:m.offset+%5$d+sizeof(%1$s)*%3$d)\n" +
-                indent + "    return T(rstrip_nul(value))\n" +
+                indent + "    value = view(m.buffer, m.offset+1+%5$d:m.offset+%5$d+sizeof(%1$s)*%3$d)\n" +
+                indent + "    return StringView(rstrip_nul(value))\n" +
                 indent + "end\n",
                 juliaTypeName,
                 propertyName,
@@ -1342,16 +1350,25 @@ public class JuliaGenerator implements CodeGenerator
                 generateStringNotPresentCondition(propertyToken.version(), indent),
                 offset,
                 formatStructName(containingStructName));
-
-            addModuleToUsing("StringViews");
-            new Formatter(sb).format("\n" +
-                indent + "%1$s_as_string(m::%2$s) = %1$s(StringView, m)\n",
-                propertyName,
-                formatStructName(containingStructName));
         }
 
         new Formatter(sb).format("\n" +
-            indent + "@inline function %1$s!(m::%2$s, value)\n" +
+            indent + "@inline function %1$s!(m::%2$sEncoder)\n" +
+            indent + "%3$s" +
+            indent + "    return %4$s\n" +
+            indent + "end\n",
+            propertyName,
+            formatStructName(containingStructName),
+            generateArrayFieldNotPresentCondition(propertyToken.version(), juliaTypeName, indent),
+            generateGetArrayReadWrite(
+            encodingToken,
+            juliaTypeName,
+            "m.buffer",
+            "m.offset+" + Integer.toString(offset),
+            "sizeof(" + juliaTypeName + ")*" + Integer.toString(arrayLength)));
+
+        new Formatter(sb).format("\n" +
+            indent + "@inline function %1$s!(m::%2$sEncoder, value)\n" +
             indent + "%3$s" +
             indent + "    copyto!(%4$s, value)\n" +
             indent + "end\n",
@@ -1404,12 +1421,13 @@ public class JuliaGenerator implements CodeGenerator
             "struct %1$s{T<:AbstractArray{UInt8}}\n" +
             "    buffer::T\n" +
             "    offset::Int64\n" +
-            "    acting_version::Int64\n" +
+            "    acting_version::UInt16\n" +
             "    function %1$s(buffer::T, offset=0, acting_version=0) where {T}\n" +
-            "        checkbounds(buffer, offset + 1 + %2$d)\n" +
             "        new{T}(buffer, offset, acting_version)\n" +
             "    end\n" +
-            "end\n",
+            "end\n" +
+            "const %1$sDecoder = %1$s\n" +
+            "const %1$sEncoder = %1$s\n",
             structName,
             size);
     }
@@ -1420,16 +1438,14 @@ public class JuliaGenerator implements CodeGenerator
         final List<Token> fields)
     {
         final int size = fields.get(0).encodedLength();
-        String sizeValue = String.format("%1$d", size);
+        CharSequence sizeValue = generateLiteral(ir.headerStructure().blockLengthType(), Integer.toString(size));
         if (size == -1)
         {
-            sizeValue = "typemax(UInt64)";
+            sizeValue = "typemax(UInt16)";
         }
 
         new Formatter(sb).format("\n" +
-            "%1$s() = %1$s(UInt8[])\n\n" +
-
-            "sbe_buffer(m::%1$s) = @inbounds view(m.buffer, m.offset+1:m.offset+%2$d)\n" +
+            "sbe_buffer(m::%1$s) = m.buffer\n" +
             "sbe_offset(m::%1$s) = m.offset\n" +
             "sbe_acting_version(m::%1$s) = m.acting_version\n",
             structName,
@@ -1437,19 +1453,23 @@ public class JuliaGenerator implements CodeGenerator
 
         new Formatter(sb).format(
             "sbe_encoded_length(::%1$s) = %2$s\n" +
+            "sbe_encoded_length(::Type{<:%1$s}) = %2$s\n" +
             "sbe_schema_id(::%1$s) = %3$s\n" +
-            "sbe_schema_version(::%1$s) = %4$s\n",
+            "sbe_schema_id(::Type{<:%1$s}) = %3$s\n" +
+            "sbe_schema_version(::%1$s) = %4$s\n" +
+            "sbe_schema_version(::Type{<:%1$s}) = %4$s\n",
             structName,
             sizeValue,
-            Integer.toString(ir.id()),
-            Integer.toString(ir.version()));
+            generateLiteral(ir.headerStructure().schemaIdType(), Integer.toString(ir.id())),
+            generateLiteral(ir.headerStructure().schemaVersionType(), Integer.toString(ir.version())));
     }
 
     private void generateMessageFlyweightStruct(
         final StringBuilder sb,
         final String structName,
         final List<Token> fields,
-        final List<Token> groups)
+        final List<Token> groups,
+        final Token token)
     {
         new Formatter(sb).format(
             "abstract type %1$s{T} end\n\n" +
@@ -1457,15 +1477,25 @@ public class JuliaGenerator implements CodeGenerator
             "    buffer::T\n" +
             "    offset::Int64\n" +
             "    position_ptr::Base.RefValue{Int64}\n" +
-            "    acting_block_length::Int64\n" +
-            "    acting_version::Int64\n" +
+            "    acting_block_length::UInt16\n" +
+            "    acting_version::UInt16\n" +
+            "    function %1$sDecoder(buffer::T, offset::Int, position_ptr::Base.RefValue{Int64},\n" +
+            "        acting_block_length::UInt16, acting_version::UInt16) where {T}\n" +
+            "        position_ptr[] = offset + acting_block_length\n" +
+            "        new{T}(buffer, offset, position_ptr, acting_block_length, acting_version)\n" +
+            "    end\n" +
             "end\n\n" +
             "struct %1$sEncoder{T<:AbstractArray{UInt8}} <: %1$s{T}\n" +
             "    buffer::T\n" +
             "    offset::Int64\n" +
             "    position_ptr::Base.RefValue{Int64}\n" +
+            "    function %1$sEncoder(buffer::T, offset::Int, position_ptr::Base.RefValue{Int64}) where {T}\n" +
+            "        position_ptr[] = offset + %2$d\n" +
+            "        new{T}(buffer, offset, position_ptr)\n" +
+            "    end\n" +
             "end\n",
-            structName);
+            structName,
+            token.encodedLength());
     }
 
     private void generateMessageFlyweightMethods(
@@ -1477,66 +1507,84 @@ public class JuliaGenerator implements CodeGenerator
         final String semanticVersion = ir.semanticVersion() == null ? "" : ir.semanticVersion();
 
         new Formatter(sb).format("\n" +
-            "@inline function %1$sDecoder(context::SbeCodecContext, buffer, offset,\n" +
-            "    acting_block_length, acting_version)\n" +
-            "    sbe_position!(context, offset + acting_block_length)\n" +
-            "    return %1$sDecoder(buffer, offset, sbe_position_ptr(context), acting_block_length, acting_version)\n" +
-            "end\n\n" +
-            "@inline function %1$sDecoder(context::SbeCodecContext, buffer, offset, hdr::MessageHeader)\n" +
-            "    return %1$sDecoder(context, buffer, offset + sbe_encoded_length(hdr),\n" +
-            "        Int64(blockLength(hdr)), Int64(version(hdr)))\n" +
-            "end\n\n" +
-            "@inline function %1$sDecoder(context::SbeCodecContext, buffer, hdr::MessageHeader)\n" +
-            "    return %1$sDecoder(context, buffer, 0, hdr)\n" +
-            "end\n\n" +
-
-            "@inline function %1$sEncoder(context::SbeCodecContext, buffer, offset=0)\n" +
-            "    sbe_position!(context, offset + %2$s)\n" +
-            "    return %1$sEncoder(buffer, offset, sbe_position_ptr(context))\n" +
+            "function %1$sDecoder(buffer::AbstractArray, offset::Int, position_ptr::Base.RefValue{Int64},\n" +
+            "    hdr::MessageHeader)\n" +
+            "    if templateId(hdr) != %3$s || schemaId(hdr) != %4$s\n" +
+            "        error(\"Template id or schema id mismatch\")\n" +
+            "    end\n" +
+            "    %1$sDecoder(buffer, offset + sbe_encoded_length(hdr), position_ptr,\n" +
+            "        blockLength(hdr), version(hdr))\n" +
             "end\n" +
-            "@inline %1$sEncoder(buffer, offset=0) = %1$sEncoder(SbeCodecContext(), buffer, offset)\n" +
-            "@inline %1$s() = %1$sEncoder(SbeCodecContext(), UInt8[])\n\n" +
+            "function %1$sDecoder(buffer::AbstractArray, position_ptr::Base.RefValue{Int64},\n" +
+            "    hdr::MessageHeader)\n" +
+            "    %1$sDecoder(buffer, 0, position_ptr, hdr)\n" +
+            "end\n" +
+            "function %1$sDecoder(buffer::AbstractArray, offset::Int,\n" +
+            "    acting_block_length::UInt16, acting_version::UInt16)\n" +
+            "    %1$sDecoder(buffer, offset, Ref(0), acting_block_length, acting_version)\n" +
+            "end\n" +
+            "function %1$sDecoder(buffer::AbstractArray, offset::Int, hdr::MessageHeader)\n" +
+            "    %1$sDecoder(buffer, offset, Ref(0), hdr)\n" +
+            "end\n" +
+            "%1$sDecoder(buffer::AbstractArray, hdr::MessageHeader) = %1$sDecoder(buffer, 0, Ref(0), hdr)\n" +
 
-            "@inline function %1$sEncoder(context::SbeCodecContext, buffer, offset, hdr::MessageHeader)\n" +
+            "function %1$sEncoder(buffer::AbstractArray, position_ptr::Base.RefValue{Int64})\n" +
+            "    %1$sEncoder(buffer, 0, position_ptr)\n" +
+            "end\n" +
+            "function %1$sEncoder(buffer::AbstractArray, offset::Int, position_ptr::Base.RefValue{Int64},\n" +
+            "    hdr::MessageHeader)\n" +
             "    blockLength!(hdr, %2$s)\n" +
             "    templateId!(hdr, %3$s)\n" +
             "    schemaId!(hdr, %4$s)\n" +
             "    version!(hdr, %5$s)\n" +
-            "    return %1$sEncoder(context, buffer, offset + sbe_encoded_length(hdr))\n" +
-            "end\n\n" +
-            "@inline function %1$sEncoder(context::SbeCodecContext, buffer, hdr::MessageHeader)\n" +
-            "    return %1$sEncoder(context, buffer, 0, hdr)\n" +
-            "end\n\n" +
+            "    %1$sEncoder(buffer, offset + sbe_encoded_length(hdr), position_ptr)\n" +
+            "end\n" +
+            "function %1$sEncoder(buffer::AbstractArray, position_ptr::Base.RefValue{Int64}, hdr::MessageHeader)\n" +
+            "    %1$sEncoder(buffer, 0, position_ptr, hdr)\n" +
+            "end\n" +
+            "function %1$sEncoder(buffer::AbstractArray, offset::Int, hdr::MessageHeader)\n" +
+            "    %1$sEncoder(buffer, offset, Ref(0), hdr)\n" +
+            "end\n" +
+            "function %1$sEncoder(buffer::AbstractArray, hdr::MessageHeader)\n" +
+            "    %1$sEncoder(buffer, 0, Ref(0), hdr)\n" +
+            "end\n" +
+            "%1$sEncoder(buffer::AbstractArray, offset::Int=0) = %1$sEncoder(buffer, offset, Ref(0))\n" +
 
             "sbe_buffer(m::%1$s) = m.buffer\n" +
             "sbe_offset(m::%1$s) = m.offset\n" +
             "sbe_position_ptr(m::%1$s) = m.position_ptr\n" +
             "sbe_position(m::%1$s) = m.position_ptr[]\n" +
-            "@inline sbe_check_position(m::%1$s, position) = (checkbounds(m.buffer, position + 1); position)\n" +
-            "@inline sbe_position!(m::%1$s, position) = m.position_ptr[] = sbe_check_position(m, position)\n" +
+            "sbe_position!(m::%1$s, position) = m.position_ptr[] = position\n" +
             "sbe_block_length(::%1$s) = %2$s\n" +
+            "sbe_block_length(::Type{<:%1$s}) = %2$s\n" +
             "sbe_template_id(::%1$s) = %3$s\n" +
+            "sbe_template_id(::Type{<:%1$s})  = %3$s\n" +
             "sbe_schema_id(::%1$s) = %4$s\n" +
+            "sbe_schema_id(::Type{<:%1$s})  = %4$s\n" +
             "sbe_schema_version(::%1$s) = %5$s\n" +
+            "sbe_schema_version(::Type{<:%1$s})  = %5$s\n" +
             "sbe_semantic_type(::%1$s) = \"%6$s\"\n" +
             "sbe_semantic_version(::%1$s) = \"%7$s\"\n" +
-            "sbe_encoded_length(m::%1$sEncoder) = sbe_position(m) - m.offset\n" +
-            "sbe_rewind!(m::%1$sEncoder) = sbe_position!(m, m.offset + %2$s)\n\n" +
-
             "sbe_acting_block_length(m::%1$sDecoder) = m.acting_block_length\n" +
+            "sbe_acting_block_length(::%1$sEncoder) = %2$s\n" +
             "sbe_acting_version(m::%1$sDecoder) = m.acting_version\n" +
-            "sbe_rewind!(m::%1$sDecoder) = sbe_position!(m, m.offset + m.acting_block_length)\n\n" +
+            "sbe_acting_version(::%1$sEncoder) = %5$s\n" +
+            "sbe_rewind!(m::%1$s) = sbe_position!(m, m.offset + m.acting_block_length)\n" +
+            "sbe_rewind!(m::%1$sEncoder) = sbe_position!(m, m.offset + %2$s)\n" +
+            "sbe_encoded_length(m::%1$s) = sbe_position(m) - m.offset\n" +
 
-            "@inline function sbe_decoded_length(m::%1$sDecoder)\n" +
-            "    skipper = %1$sEncoder(m.buffer, m.offset)\n" +
+            "@inline function sbe_decoded_length(m::%1$s)\n" +
+            "    skipper = %1$sDecoder(sbe_buffer(m), sbe_offset(m),\n" +
+            "        sbe_acting_block_length(m), sbe_acting_version(m))\n" +
+            "    sbe_rewind!(skipper)\n" +
             "    skip!(skipper)\n" +
-            "    return sbe_encoded_length(skipper)\n" +
+            "    sbe_encoded_length(skipper)\n" +
             "end\n",
             structName,
-            Integer.toString(token.encodedLength()),
-            Integer.toString(token.id()),
-            Integer.toString(ir.id()),
-            Integer.toString(ir.version()),
+            generateLiteral(ir.headerStructure().blockLengthType(), Integer.toString(token.encodedLength())),
+            generateLiteral(ir.headerStructure().templateIdType(), Integer.toString(token.id())),
+            generateLiteral(ir.headerStructure().schemaIdType(), Integer.toString(ir.id())),
+            generateLiteral(ir.headerStructure().schemaVersionType(), Integer.toString(ir.version())),
             semanticType,
             semanticVersion);
     }
@@ -1594,16 +1642,16 @@ public class JuliaGenerator implements CodeGenerator
         final String structName)
     {
         new Formatter(sb).format(
-            indent + "%1$s_id(::%3$s) = %2$d\n",
+            indent + "%1$s_id(::%3$s) = %2$s\n",
             propertyName,
-            fieldToken.id(),
+            generateLiteral(ir.headerStructure().schemaIdType(), Integer.toString(fieldToken.id())),
             structName);
 
         new Formatter(sb).format(
-            indent + "%1$s_since_version(::%3$s) = %2$d\n" +
-            indent + "%1$s_in_acting_version(m::%3$s) = sbe_acting_version(m) >= %2$d\n",
+            indent + "%1$s_since_version(::%3$s) = %2$s\n" +
+            indent + "%1$s_in_acting_version(m::%3$s) = sbe_acting_version(m) >= %2$s\n",
             propertyName,
-            fieldToken.version(),
+            generateLiteral(ir.headerStructure().schemaVersionType(), Integer.toString(fieldToken.version())),
             structName);
 
         new Formatter(sb).format(
@@ -1636,7 +1684,7 @@ public class JuliaGenerator implements CodeGenerator
         {
             final String constValue = fieldToken.encoding().constValue().toString();
             new Formatter(sb).format(
-                indent + "%2$s_raw(::%3$s) = %1$s(%5$s.%4$s)\n",
+                indent + "%2$s(::Type{Integer}, ::%3$sDecoder) = %1$s(%5$s.%4$s)\n",
                 typeName,
                 propertyName,
                 containingStructName,
@@ -1644,7 +1692,7 @@ public class JuliaGenerator implements CodeGenerator
                 enumName);
 
             new Formatter(sb).format(
-                indent + "@inline function %2$s(m::%1$s)\n" +
+                indent + "@inline function %2$s(m::%1$sDecoder)\n" +
                 "%3$s" +
                 indent + "    return %5$s.%4$s\n" +
                 indent + "end\n",
@@ -1658,7 +1706,7 @@ public class JuliaGenerator implements CodeGenerator
         {
             final String offsetStr = Integer.toString(offset);
             new Formatter(sb).format(
-                indent + "@inline function %1$s_raw(m::%4$s)\n" +
+                indent + "@inline function %1$s(::Type{Integer}, m::%4$sDecoder)\n" +
                 "%2$s" +
                 indent + "    return %3$s\n" +
                 indent + "end\n",
@@ -1668,7 +1716,7 @@ public class JuliaGenerator implements CodeGenerator
                 containingStructName);
 
             new Formatter(sb).format(
-                indent + "@inline function %2$s(m::%1$s)\n" +
+                indent + "@inline function %2$s(m::%1$sDecoder)\n" +
                 "%3$s" +
                 indent + "    return %5$s.SbeEnum(%4$s)\n" +
                 indent + "end\n",
@@ -1695,7 +1743,7 @@ public class JuliaGenerator implements CodeGenerator
     }
 
 
-    private CharSequence generateLiteral(final PrimitiveType type, final String value)
+    private String generateLiteral(final PrimitiveType type, final String value)
     {
         String literal = "";
         final String juliaTypeName = juliaTypeName(type);
@@ -1743,15 +1791,14 @@ public class JuliaGenerator implements CodeGenerator
         final String indent)
     {
         new Formatter(sb).format("\n" +
-            "function Base.show(io::IO, m::%1$s{T}) where {T}\n" +
+            "function show(io::IO, m::%1$s{T}) where {T}\n" +
             "    println(io, \"%1$s view over a type $T\")\n" +
             "    println(io, \"SbeBlockLength: \", sbe_block_length(m))\n" +
             "    println(io, \"SbeTemplateId:  \", sbe_template_id(m))\n" +
             "    println(io, \"SbeSchemaId:    \", sbe_schema_id(m))\n" +
             "    println(io, \"SbeSchemaVersion: \", sbe_schema_version(m))\n" +
             "\n" +
-            "    writer = %1$sDecoder(SbeCodecContext(), sbe_buffer(m), sbe_offset(m),\n" +
-            "        sbe_block_length(m), sbe_schema_version(m))\n" +
+            "    writer = %1$sDecoder(sbe_buffer(m), sbe_offset(m), sbe_block_length(m), sbe_schema_version(m))\n" +
             "%2$s" +
             "    nothing\n" +
             "end\n",
@@ -1769,7 +1816,7 @@ public class JuliaGenerator implements CodeGenerator
         final String indent)
     {
         new Formatter(sb).format("\n" +
-            "function Base.show(io::IO, writer::%1$s{T}) where {T}\n" +
+            "function show(io::IO, writer::%1$s{T}) where {T}\n" +
             "    println(io, \"%1$s view over a type $T\")\n" +
             "%2$s" +
             "end\n",
@@ -1784,7 +1831,7 @@ public class JuliaGenerator implements CodeGenerator
         final List<Token> tokens)
     {
         new Formatter(sb).format("\n" +
-            "function Base.show(io::IO, writer::%1$s{T}) where {T}\n" +
+            "function show(io::IO, writer::%1$s{T}) where {T}\n" +
             "    println(io, \"%1$s view over a type $T\")\n" +
             "%2$s" +
             "end\n",
@@ -1829,7 +1876,7 @@ public class JuliaGenerator implements CodeGenerator
             new Formatter(sb).format(
                 indent + "println(io, \"%1$s:\")\n" +
                 indent + "for group in %2$s(writer)\n" +
-                indent + "    Base.show(io, group)\n" +
+                indent + "    show(io, group)\n" +
                 indent + "    println(io)\n" +
                 indent + "end\n",
                 formatStructName(groupToken.name()),
@@ -1942,13 +1989,13 @@ public class JuliaGenerator implements CodeGenerator
                 if (0 == typeToken.version())
                 {
                     new Formatter(sb).format(
-                        indent + "Base.show(io, %1$s)\n",
+                        indent + "show(io, %1$s)\n",
                         fieldName);
                 }
                 else
                 {
                     new Formatter(sb).format(
-                        indent + "%1$s_in_acting_version(writer) && Base.show(io, %2$s)\n",
+                        indent + "%1$s_in_acting_version(writer) && show(io, %2$s)\n",
                         formatPropertyName(fieldTokenName),
                         fieldName);
                 }
@@ -1972,7 +2019,7 @@ public class JuliaGenerator implements CodeGenerator
         collect(Signal.CHOICE, tokens, 0, choiceTokens);
 
         new Formatter(sb).format("\n" +
-            "function Base.show(io::IO, writer::%1$s)\n" +
+            "function show(io::IO, writer::%1$s)\n" +
             "    print(io, \"[\")\n",
             name);
 
