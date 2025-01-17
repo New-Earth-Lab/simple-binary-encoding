@@ -572,7 +572,7 @@ public class JuliaGenerator implements CodeGenerator
                 generateGroups(sb, structName, groups, BASE_INDENT);
                 generateVarData(sb, structName, varData, BASE_INDENT);
                 generateDisplay(sb, structName, fields, groups, varData, INDENT);
-                generateMessageLength(sb, groups, varData, BASE_INDENT, structName);
+                generateMessageLength(sb, true, groups, varData, BASE_INDENT, structName);
 
                 out.append(generateFileHeader());
                 out.append(sb);
@@ -653,7 +653,7 @@ public class JuliaGenerator implements CodeGenerator
             generateVarData(sb, groupStructName, varData, indent);
 
             generateGroupDisplay(sb, groupStructName, fields, groups, varData, indent);
-            generateMessageLength(sb, groups, varData, indent, groupStructName);
+            generateMessageLength(sb, false, groups, varData, indent, groupStructName);
 
             generateGroupProperty(sb, groupName, outerStructName, groupToken, indent);
         }
@@ -737,8 +737,8 @@ public class JuliaGenerator implements CodeGenerator
                 indent + "@inline function skip_%1$s!(m::%4$s)\n" +
                 "%2$s" +
                 indent + "    len = %1$s_length(m)\n" +
-                indent + "    pos = sbe_position(m) + len + %3$d\n" +
-                indent + "    sbe_position!(m, pos)\n" +
+                indent + "    pos = sbe_position(m) + %3$d\n" +
+                indent + "    sbe_position!(m, pos + len)\n" +
                 indent + "    return len\n" +
                 indent + "end\n",
                 propertyName,
@@ -1580,8 +1580,7 @@ public class JuliaGenerator implements CodeGenerator
             "@inline function sbe_decoded_length(m::%1$s)\n" +
             "    skipper = %1$sDecoder(sbe_buffer(m), sbe_offset(m),\n" +
             "        sbe_acting_block_length(m), sbe_acting_version(m))\n" +
-            "    sbe_rewind!(skipper)\n" +
-            "    skip!(skipper)\n" +
+            "    sbe_skip!(skipper)\n" +
             "    sbe_encoded_length(skipper)\n" +
             "end\n",
             structName,
@@ -2063,6 +2062,7 @@ public class JuliaGenerator implements CodeGenerator
 
     private void generateMessageLength(
         final StringBuilder sb,
+        final boolean isParent,
         final List<Token> groups,
         final List<Token> varData,
         final String indent,
@@ -2082,9 +2082,9 @@ public class JuliaGenerator implements CodeGenerator
             final int endSignal = findEndSignal(groups, i, Signal.END_GROUP, groupToken.name());
 
             new Formatter(sbSkip).format(
-                indent + ("    for group in %1$s(m)\n") +
-                indent + ("        skip!(group)\n") +
-                indent + ("    end\n"),
+                indent + "    for group in %1$s(m)\n" +
+                indent + "        sbe_skip!(group)\n" +
+                indent + "    end\n",
                 formatPropertyName(groupToken.name()));
 
             i = endSignal;
@@ -2106,10 +2106,12 @@ public class JuliaGenerator implements CodeGenerator
         }
 
         new Formatter(sb).format("\n" +
-            indent + "@inline function skip!(m::%1$s)\n" +
+            indent + "@inline function sbe_skip!(m::%1$s)\n" +
+            indent + "    %2$s\n" +
             sbSkip +
             indent + "    return\n" +
             indent + "end\n",
-            structName);
+            structName,
+            isParent ? "sbe_rewind!(m)" : "");
     }
 }
