@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2025 Real Logic Limited.
+ * Copyright 2013-2024 Real Logic Limited.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -217,7 +217,7 @@ public class JuliaGenerator implements CodeGenerator
         if (version > 0)
         {
             new Formatter(sb).format("\n" +
-                indent + "function %2$s(m::%1$s)\n" +
+                indent + "@inline function %2$s(m::%1$s)\n" +
                 indent + "    if sbe_acting_version(m) < %3$d\n" +
                 indent + "        return %4$sDecoder(m.buffer, 0, sbe_position_ptr(m), 0\n" +
                 indent + "            sbe_acting_version(m), 0, 0)\n" +
@@ -1512,7 +1512,7 @@ public class JuliaGenerator implements CodeGenerator
         final String semanticVersion = ir.semanticVersion() == null ? "" : ir.semanticVersion();
 
         new Formatter(sb).format("\n" +
-            "function %1$sDecoder(buffer::AbstractArray, offset::Int64, position_ptr::Base.RefValue{Int64},\n" +
+            "@inline function %1$sDecoder(buffer::AbstractArray, offset::Int64, position_ptr::Base.RefValue{Int64},\n" +
             "    hdr::MessageHeader)\n" +
             "    if templateId(hdr) != %3$s || schemaId(hdr) != %4$s\n" +
             "        error(\"Template id or schema id mismatch\")\n" +
@@ -1520,23 +1520,23 @@ public class JuliaGenerator implements CodeGenerator
             "    %1$sDecoder(buffer, offset + sbe_encoded_length(hdr), position_ptr,\n" +
             "        blockLength(hdr), version(hdr))\n" +
             "end\n" +
-            "function %1$sDecoder(buffer::AbstractArray, position_ptr::Base.RefValue{Int64},\n" +
+            "@inline function %1$sDecoder(buffer::AbstractArray, position_ptr::Base.RefValue{Int64},\n" +
             "    hdr::MessageHeader)\n" +
             "    %1$sDecoder(buffer, 0, position_ptr, hdr)\n" +
             "end\n" +
-            "function %1$sDecoder(buffer::AbstractArray, offset::Int64,\n" +
+            "@inline function %1$sDecoder(buffer::AbstractArray, offset::Int64,\n" +
             "    acting_block_length::Integer, acting_version::Integer)\n" +
             "    %1$sDecoder(buffer, offset, Ref(0), acting_block_length, acting_version)\n" +
             "end\n" +
-            "function %1$sDecoder(buffer::AbstractArray, offset::Int64, hdr::MessageHeader)\n" +
+            "@inline function %1$sDecoder(buffer::AbstractArray, offset::Int64, hdr::MessageHeader)\n" +
             "    %1$sDecoder(buffer, offset, Ref(0), hdr)\n" +
             "end\n" +
-            "%1$sDecoder(buffer::AbstractArray, hdr::MessageHeader) = %1$sDecoder(buffer, 0, Ref(0), hdr)\n" +
+            "@inline %1$sDecoder(buffer::AbstractArray, hdr::MessageHeader) = %1$sDecoder(buffer, 0, Ref(0), hdr)\n" +
 
-            "function %1$sEncoder(buffer::AbstractArray, position_ptr::Base.RefValue{Int64})\n" +
+            "@inline function %1$sEncoder(buffer::AbstractArray, position_ptr::Base.RefValue{Int64})\n" +
             "    %1$sEncoder(buffer, 0, position_ptr)\n" +
             "end\n" +
-            "function %1$sEncoder(buffer::AbstractArray, offset::Int64, position_ptr::Base.RefValue{Int64},\n" +
+            "@inline function %1$sEncoder(buffer::AbstractArray, offset::Int64, position_ptr::Base.RefValue{Int64},\n" +
             "    hdr::MessageHeader)\n" +
             "    blockLength!(hdr, %2$s)\n" +
             "    templateId!(hdr, %3$s)\n" +
@@ -1544,16 +1544,17 @@ public class JuliaGenerator implements CodeGenerator
             "    version!(hdr, %5$s)\n" +
             "    %1$sEncoder(buffer, offset + sbe_encoded_length(hdr), position_ptr)\n" +
             "end\n" +
-            "function %1$sEncoder(buffer::AbstractArray, position_ptr::Base.RefValue{Int64}, hdr::MessageHeader)\n" +
+            "@inline function %1$sEncoder(buffer::AbstractArray, position_ptr::Base.RefValue{Int64}," +
+            "    hdr::MessageHeader)\n" +
             "    %1$sEncoder(buffer, 0, position_ptr, hdr)\n" +
             "end\n" +
-            "function %1$sEncoder(buffer::AbstractArray, offset::Int64, hdr::MessageHeader)\n" +
+            "@inline function %1$sEncoder(buffer::AbstractArray, offset::Int64, hdr::MessageHeader)\n" +
             "    %1$sEncoder(buffer, offset, Ref(0), hdr)\n" +
             "end\n" +
-            "function %1$sEncoder(buffer::AbstractArray, hdr::MessageHeader)\n" +
+            "@inline function %1$sEncoder(buffer::AbstractArray, hdr::MessageHeader)\n" +
             "    %1$sEncoder(buffer, 0, Ref(0), hdr)\n" +
             "end\n" +
-            "%1$sEncoder(buffer::AbstractArray, offset::Int64=0) = %1$sEncoder(buffer, offset, Ref(0))\n" +
+            "@inline %1$sEncoder(buffer::AbstractArray, offset::Int64=0) = %1$sEncoder(buffer, offset, Ref(0))\n" +
 
             "sbe_buffer(m::%1$s) = m.buffer\n" +
             "sbe_offset(m::%1$s) = m.offset\n" +
