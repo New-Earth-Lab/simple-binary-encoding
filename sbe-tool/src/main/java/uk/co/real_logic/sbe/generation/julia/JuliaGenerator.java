@@ -1385,6 +1385,23 @@ public class JuliaGenerator implements CodeGenerator
             "m.buffer",
             "m.offset+" + Integer.toString(offset),
             "sizeof(" + juliaTypeName + ")*" + Integer.toString(arrayLength)));
+
+        if (encodingToken.encoding().primitiveType() == PrimitiveType.CHAR)
+        {
+            new Formatter(sb).format("\n" +
+                indent + "@inline function %2$s!(::Type{<:AbstractString}, m::%6$sEncoder, value::AbstractString)\n" +
+                indent + "%4$s" +
+                indent + "    dest = view(m.buffer, m.offset+1+%5$d:m.offset+%5$d+sizeof(%1$s)*%3$d)\n" +
+                indent + "    fill!(dest, 0)\n" +
+                indent + "    copyto!(dest, value)\n" +
+                indent + "end\n",
+                juliaTypeName,
+                propertyName,
+                arrayLength,
+                generateStringNotPresentCondition(propertyToken.version(), indent),
+                offset,
+                formatStructName(containingStructName));
+        }
     }
 
     private void generateConstPropertyMethods(
