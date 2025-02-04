@@ -719,7 +719,7 @@ public class JuliaGenerator implements CodeGenerator
             new Formatter(sb).format("\n" +
                 indent + "@inline function %1$s_length!(m::%5$sEncoder, n)\n" +
                 "%2$s" +
-                indent + "    if !checkbounds(Bool, m.buffer, sbe_position(m) + 1 + %4$d + n)\n" +
+                indent + "    if !checkbounds(Bool, m.buffer, sbe_position(m) + %4$d + n)\n" +
                 indent + "        error(\"buffer too short for data length\")\n" +
                 indent + "    elseif n > %6$d\n" +
                 indent + "        error(\"data length too large for length type\")\n" +
