@@ -90,7 +90,7 @@ class ErrorHandlerTest
         parseTestXmlAddToMap(map, "/types/set", testXmlString, handler);
 
         assertThat(handler.errorCount(), is(2));
-        assertThat(handler.warningCount(), is(33));
+        assertThat(handler.warningCount(), is(40));
     }
 
     @Test
@@ -222,7 +222,7 @@ class ErrorHandlerTest
         }
         catch (final IllegalStateException ex)
         {
-            assertEquals("had 16 warnings", ex.getMessage());
+            assertEquals("had 20 warnings", ex.getMessage());
             return;
         }
 
