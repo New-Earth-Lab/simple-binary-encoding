@@ -858,7 +858,7 @@ public class JuliaGenerator implements CodeGenerator
                 indent + "    pos = sbe_position(m) + %3$d\n" +
                 indent + "    sbe_position!(m, pos + len)\n" +
                 indent + "    dest = view(m.buffer, pos+1:pos+len)\n" +
-                indent + "    copyto!(dest, transcode(UInt8, src))\n" +
+                indent + "    copyto!(dest, codeunits(src))\n" +
                 indent + "end\n",
                 propertyName,
                 generateTypeFieldNotPresentCondition(version, "UInt8", indent),
