@@ -1596,7 +1596,8 @@ public class JuliaGenerator implements CodeGenerator
             "sbe_schema_id(::%1$s) = %3$s\n" +
             "sbe_schema_id(::Type{<:%1$s}) = %3$s\n" +
             "sbe_schema_version(::%1$s) = %4$s\n" +
-            "sbe_schema_version(::Type{<:%1$s}) = %4$s\n",
+            "sbe_schema_version(::Type{<:%1$s}) = %4$s\n" +
+            "Base.sizeof(m::%1$s) = sbe_encoded_length(m)\n",
             structName,
             sizeValue,
             generateLiteral(ir.headerStructure().schemaIdType(), Integer.toString(ir.id())),
@@ -1702,6 +1703,7 @@ public class JuliaGenerator implements CodeGenerator
             "    sbe_skip!(skipper)\n" +
             "    sbe_encoded_length(skipper)\n" +
             "end\n\n" +
+            "Base.sizeof(m::%1$s) = sbe_decoded_length(m)\n" +
             "function Base.convert(::Type{AbstractArray{UInt8}}, m::%1$sEncoder{<:AbstractArray{UInt8},true})\n" +
             "    return view(m.buffer, " +
             "m.offset+1-sbe_encoded_length(MessageHeader):m.offset+sbe_encoded_length(m))\n" +
