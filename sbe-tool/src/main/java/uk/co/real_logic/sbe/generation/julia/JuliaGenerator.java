@@ -696,21 +696,24 @@ public class JuliaGenerator implements CodeGenerator
             generateFieldMetaAttributeMethod(sb, token, indent, structName);
 
             new Formatter(sb).format("\n" +
-                indent + "%1$s_character_encoding(::%3$s) = \"%2$s\"\n",
+                indent + "%1$s_character_encoding(::%3$s) = \"%2$s\"\n" +
+                indent + "%1$s_character_encoding(::Type{<:%3$s}) = \"%2$s\"\n",
                 propertyName,
                 characterEncoding,
                 structName);
 
             new Formatter(sb).format(
                 indent + "%1$s_in_acting_version(m::%4$s) = sbe_acting_version(m) >= %2$d\n" +
-                indent + "%1$s_id(::%4$s) = %3$d\n",
+                indent + "%1$s_id(::%4$s) = %3$d\n" +
+                indent + "%1$s_id(::Type{<:%4$s}) = %3$d\n",
                 propertyName,
                 version,
                 id,
                 structName);
 
             new Formatter(sb).format(
-                indent + "%1$s_header_length(::%3$s) = %2$d\n",
+                indent + "%1$s_header_length(::%3$s) = %2$d\n" +
+                indent + "%1$s_header_length(::Type{<:%3$s}) = %2$d\n",
                 propertyName,
                 lengthOfLengthField,
                 structName);
@@ -1226,28 +1229,32 @@ public class JuliaGenerator implements CodeGenerator
         final CharSequence nullValueString = generateNullValueLiteral(primitiveType, encoding);
 
         new Formatter(sb).format(
-            indent + "%1$s_null_value(::%4$s) = %3$s\n",
+            indent + "%1$s_null_value(::%4$s) = %3$s\n" +
+            indent + "%1$s_null_value(::Type{<:%4$s}) = %3$s\n",
             propertyName,
             juliaTypeName,
             nullValueString,
             structName);
 
         new Formatter(sb).format(
-            indent + "%1$s_min_value(::%4$s) = %3$s\n",
+            indent + "%1$s_min_value(::%4$s) = %3$s\n" +
+            indent + "%1$s_min_value(::Type{<:%4$s}) = %3$s\n",
             propertyName,
             juliaTypeName,
             generateLiteral(primitiveType, token.encoding().applicableMinValue().toString()),
             structName);
 
         new Formatter(sb).format(
-            indent + "%1$s_max_value(::%4$s) = %3$s\n",
+            indent + "%1$s_max_value(::%4$s) = %3$s\n" +
+            indent + "%1$s_max_value(::Type{<:%4$s}) = %3$s\n",
             propertyName,
             juliaTypeName,
             generateLiteral(primitiveType, token.encoding().applicableMaxValue().toString()),
             structName);
 
         new Formatter(sb).format(
-            indent + "%1$s_encoding_length(::%3$s) = %2$d\n",
+            indent + "%1$s_encoding_length(::%3$s) = %2$d\n" +
+            indent + "%1$s_encoding_length(::Type{<:%3$s}) = %2$d\n",
             propertyName,
             token.encoding().primitiveType().size() * token.arrayLength(),
             structName);
@@ -1406,13 +1413,15 @@ public class JuliaGenerator implements CodeGenerator
 
         final int arrayLength = encodingToken.arrayLength();
         new Formatter(sb).format(
-            indent + "%1$s_length(::%3$s) = %2$d\n",
+            indent + "%1$s_length(::%3$s) = %2$d\n" +
+            indent + "%1$s_length(::Type{<:%3$s}) = %2$d\n",
             propertyName,
             arrayLength,
             formatStructName(containingStructName));
 
         new Formatter(sb).format(
-            indent + "%1$s_eltype(::%3$s) = %2$s\n",
+            indent + "%1$s_eltype(::%3$s) = %2$s\n" +
+            indent + "%1$s_eltype(::Type{<:%3$s}) = %2$s\n",
             propertyName,
             juliaTypeName,
             formatStructName(containingStructName));
@@ -1533,7 +1542,8 @@ public class JuliaGenerator implements CodeGenerator
         if (token.encoding().primitiveType() != PrimitiveType.CHAR)
         {
             new Formatter(sb).format(
-                indent + "%2$s(::%4$s) = %3$s\n",
+                indent + "%2$s(::%4$s) = %3$s\n" +
+                indent + "%2$s(::Type{<:%4$s}) = %3$s\n",
                 juliaTypeName,
                 propertyName,
                 generateLiteral(token.encoding().primitiveType(), token.encoding().constValue().toString()),
@@ -1542,7 +1552,8 @@ public class JuliaGenerator implements CodeGenerator
         else
         {
             new Formatter(sb).format(
-                indent + "%1$s(::%3$s) = \"%2$s\"\n",
+                indent + "%1$s(::%3$s) = \"%2$s\"\n" +
+                indent + "%1$s(::Type{<:%3$s}) = \"%2$s\"\n",
                 propertyName,
                 token.encoding().constValue().toString(),
                 structName);
@@ -1773,20 +1784,23 @@ public class JuliaGenerator implements CodeGenerator
         final String structName)
     {
         new Formatter(sb).format(
-            indent + "%1$s_id(::%3$s) = %2$s\n",
+            indent + "%1$s_id(::%3$s) = %2$s\n" +
+            indent + "%1$s_id(::Type{<:%3$s}) = %2$s\n",
             propertyName,
             generateLiteral(ir.headerStructure().schemaIdType(), Integer.toString(fieldToken.id())),
             structName);
 
         new Formatter(sb).format(
             indent + "%1$s_since_version(::%3$s) = %2$s\n" +
+            indent + "%1$s_since_version(::Type{<:%3$s}) = %2$s\n" +
             indent + "%1$s_in_acting_version(m::%3$s) = sbe_acting_version(m) >= %2$s\n",
             propertyName,
             generateLiteral(ir.headerStructure().schemaVersionType(), Integer.toString(fieldToken.version())),
             structName);
 
         new Formatter(sb).format(
-            indent + "%1$s_encoding_offset(::%3$s) = %2$d\n",
+            indent + "%1$s_encoding_offset(::%3$s) = %2$d\n" +
+            indent + "%1$s_encoding_offset(::Type{<:%3$s}) = %2$d\n",
             propertyName,
             encodingToken.offset(),
             structName);
@@ -1806,7 +1820,8 @@ public class JuliaGenerator implements CodeGenerator
         final int offset = encodingToken.offset();
 
         new Formatter(sb).format(
-            indent + "%2$s_encoding_length(::%1$s) = %3$d\n",
+            indent + "%2$s_encoding_length(::%1$s) = %3$d\n" +
+            indent + "%2$s_encoding_length(::Type{<:%1$s}) = %3$d\n",
             containingStructName,
             propertyName,
             fieldToken.encodedLength());
@@ -1883,11 +1898,21 @@ public class JuliaGenerator implements CodeGenerator
         {
             case CHAR:
             case UINT8:
+                literal = juliaTypeName + "(0x" + Long.toHexString(Long.parseLong(value) & 0xff) + ")";
+                break;
+
             case UINT16:
+                literal = juliaTypeName + "(0x" + Long.toHexString(Long.parseLong(value) & 0xffff) + ")";
+                break;
+
             case UINT32:
+                literal = juliaTypeName + "(0x" + Long.toHexString(Long.parseLong(value) & 0xffffffff) + ")";
+                break;
+
             case UINT64:
                 literal = juliaTypeName + "(0x" + Long.toHexString(Long.parseLong(value)) + ")";
                 break;
+
             case INT8:
             case INT16:
             case INT32:
