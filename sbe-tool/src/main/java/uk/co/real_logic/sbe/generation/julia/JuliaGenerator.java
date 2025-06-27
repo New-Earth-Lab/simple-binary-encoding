@@ -822,7 +822,7 @@ public class JuliaGenerator implements CodeGenerator
             new Formatter(sb).format("\n" +
                 indent + "@inline function %1$s!(m::%6$sEncoder, src::AbstractArray)\n" +
                 "%2$s" +
-                indent + "    len = sizeof(src)\n" +
+                indent + "    len = sizeof(eltype(src)) * length(src)\n" +
                 indent + "    %1$s_length!(m, len)\n" +
                 indent + "    pos = sbe_position(m) + %3$d\n" +
                 indent + "    sbe_position!(m, pos + len)\n" +
